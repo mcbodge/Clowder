@@ -1,4 +1,13 @@
-# Copilot Agent Team
+```text
+   ╱|、
+  (˚ˎ 。7    CLOWDER
+   |、˜〵     a clowder of coding agents & tools · aka CAT
+   じしˍ,)ノ
+```
+
+# Clowder
+
+> **CCAATT** — a **C**lowder of **C**oding **A**gents **A**wesome-ish **T**eam and **T**ools.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
