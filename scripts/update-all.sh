@@ -6,11 +6,21 @@
 # azure-devops-cli skill, and graphify when their CLIs are installed. Run it from anywhere,
 # even outside a clone: it reuses the clone it runs from, or clones to
 # $HOME/.copilot/.cache/clowder. Override with CLOWDER_DIR / _URL.
+# Pass --project <repo> to install into that repository's .github folder instead of your user
+# profile (one method per run; ~/.copilot, editor prompts, and companion tools are left alone).
 set -euo pipefail
 
 COPILOT="$HOME/.copilot"
 URL="${CLOWDER_URL:-https://github.com/mcbodge/clowder.git}"
 REPO="${CLOWDER_DIR:-}"
+PROJECT=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --project=*) PROJECT="${1#*=}" ;;
+    --project) shift; PROJECT="${1:-}" ;;
+  esac
+  shift || true
+done
 
 # 1. Locate the repo: explicit override, the clone this script runs from, or the cache clone.
 if [ -z "$REPO" ]; then
@@ -33,6 +43,18 @@ else
   echo "==> Cloning clowder into $REPO"
   mkdir -p "$(dirname "$REPO")"
   git clone "$URL" "$REPO"
+fi
+
+# Project mode: install into a repository's .github folder only, then stop (one method per run).
+if [ -n "$PROJECT" ]; then
+  [ -d "$PROJECT" ] || { echo "--project '$PROJECT' not found." >&2; exit 1; }
+  GH="$PROJECT/.github"
+  mkdir -p "$GH/agents" "$GH/instructions" "$GH/skills"
+  cp "$REPO"/agents/*.agent.md "$GH/agents/"
+  cp "$REPO"/instructions/*.instructions.md "$GH/instructions/"
+  cp -R "$REPO"/skills/* "$GH/skills/"
+  echo "==> Installed into $GH (agents, instructions, skills)."
+  exit 0
 fi
 
 # 3. Copy this repo's pieces into the user profile.

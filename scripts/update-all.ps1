@@ -11,10 +11,15 @@
   then to $HOME\.copilot\.cache\clowder. Also set by $env:CLOWDER_DIR.
 .PARAMETER Url
   Git URL to clone from when RepoDir has no clone yet. Also set by $env:CLOWDER_URL.
+.PARAMETER ProjectDir
+  Install into this repository's .github folder (agents, instructions, skills) instead of your
+  user profile. One method per run: with ProjectDir set, nothing is written to ~/.copilot or the
+  editor prompt folders, and companion tools are not touched.
 #>
 param(
     [string]$RepoDir = $env:CLOWDER_DIR,
-    [string]$Url     = $(if ($env:CLOWDER_URL) { $env:CLOWDER_URL } else { 'https://github.com/mcbodge/clowder.git' })
+    [string]$Url     = $(if ($env:CLOWDER_URL) { $env:CLOWDER_URL } else { 'https://github.com/mcbodge/clowder.git' }),
+    [string]$ProjectDir
 )
 
 # Native tools (git/npm/gh/uv) print progress to stderr; keep that from aborting the run.
@@ -58,6 +63,18 @@ if (Test-Path (Join-Path $repo '.git')) {
     New-Item -ItemType Directory -Force (Split-Path -Parent $repo) | Out-Null
     git clone $Url $repo
     if ($LASTEXITCODE -ne 0) { Write-Error "git clone failed with exit $LASTEXITCODE."; exit 1 }
+}
+
+# Project mode: install into a repository's .github folder only, then stop (one method per run).
+if ($ProjectDir) {
+    if (-not (Test-Path $ProjectDir)) { Write-Error "ProjectDir '$ProjectDir' not found."; exit 1 }
+    $gh = Join-Path $ProjectDir '.github'
+    New-Item -ItemType Directory -Force "$gh\agents", "$gh\instructions", "$gh\skills" | Out-Null
+    Copy-Item "$repo\agents\*.agent.md" "$gh\agents" -Force -ErrorAction Stop
+    Copy-Item "$repo\instructions\*.instructions.md" "$gh\instructions" -Force -ErrorAction Stop
+    Copy-Item "$repo\skills\*" "$gh\skills" -Recurse -Force -ErrorAction Stop
+    Write-Host "==> Installed into $gh (agents, instructions, skills)." -ForegroundColor Green
+    exit 0
 }
 
 # 3. Copy this repo's pieces into the user profile.

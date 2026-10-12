@@ -11,7 +11,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
-GitHub Copilot custom agents, instructions, skills, and hooks that take a feature request or an Azure DevOps work item from refinement to a tested, reviewed commit. They're tuned for .NET, Blazor, and MudBlazor repositories on Azure DevOps; most pieces work with any stack.
+Custom agents, instructions, skills, and hooks for AI coding assistants that take a feature request or an Azure DevOps work item from refinement to a tested, reviewed commit. Built for GitHub Copilot in VS Code, Visual Studio, and the CLI, and usable from any agent that reads a repository's `.github/` customizations or `AGENTS.md` — Antigravity, Cursor, Windsurf, Cline, Kiro, and more (see [Other agents & IDEs](#other-agents--ides)). They're tuned for .NET, Blazor, and MudBlazor repositories on Azure DevOps; most pieces work with any stack.
 
 - [How the team works](#how-the-team-works)
 - [🐱 Agents](#-agents)
@@ -20,8 +20,10 @@ GitHub Copilot custom agents, instructions, skills, and hooks that take a featur
 - [🪝 Hooks](#-hooks)
 - [Install everything](#install-everything)
 - [Install or update everything](#install-or-update-everything)
+- [Install into a project (.github)](#install-into-a-project-github)
 - [Prerequisites and companions](#prerequisites-and-companions)
 - [Visual Studio 2026](#visual-studio-2026)
+- [Other agents & IDEs](#other-agents--ides)
 - [About Ponytail](#about-ponytail)
 - [About the Karpathy guidelines](#about-the-karpathy-guidelines)
 - [License](#license)
@@ -77,6 +79,7 @@ The planners (**CAT Planner** and **CAT Planner (DevOps)**) and the **Plan Execu
 | [CAT TDD Green](agents/cat-tdd-green.agent.md)<br />[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect?url=vscode%3Achat-agent%2Finstall%3Furl%3Dhttps%3A%2F%2Fraw.githubusercontent.com%2Fmcbodge%2Fclowder%2Fmain%2Fagents%2Fcat-tdd-green.agent.md)<br />[![Install in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect?url=vscode-insiders%3Achat-agent%2Finstall%3Furl%3Dhttps%3A%2F%2Fraw.githubusercontent.com%2Fmcbodge%2Fclowder%2Fmain%2Fagents%2Fcat-tdd-green.agent.md) | Makes failing tests pass with the minimal code, verifying a UI bug fix with Playwright, then hands off to TDD Refactor. | TDD Refactor; optional: playwright-cli |
 | [CAT TDD Refactor](agents/cat-tdd-refactor.agent.md)<br />[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect?url=vscode%3Achat-agent%2Finstall%3Furl%3Dhttps%3A%2F%2Fraw.githubusercontent.com%2Fmcbodge%2Fclowder%2Fmain%2Fagents%2Fcat-tdd-refactor.agent.md)<br />[![Install in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect?url=vscode-insiders%3Achat-agent%2Finstall%3Furl%3Dhttps%3A%2F%2Fraw.githubusercontent.com%2Fmcbodge%2Fclowder%2Fmain%2Fagents%2Fcat-tdd-refactor.agent.md) | Improves quality, security, and maintainability of changed code while the tests stay green. | - |
 | [CAT Code Reviewer](agents/cat-code-reviewer.agent.md)<br />[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect?url=vscode%3Achat-agent%2Finstall%3Furl%3Dhttps%3A%2F%2Fraw.githubusercontent.com%2Fmcbodge%2Fclowder%2Fmain%2Fagents%2Fcat-code-reviewer.agent.md)<br />[![Install in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect?url=vscode-insiders%3Achat-agent%2Finstall%3Furl%3Dhttps%3A%2F%2Fraw.githubusercontent.com%2Fmcbodge%2Fclowder%2Fmain%2Fagents%2Fcat-code-reviewer.agent.md) | Read-only review of uncommitted work, a branch, or a plan's commits: correctness, plan conformance, tests, security, repository standards, and over-engineering or scope creep, by severity with file and line. | - |
+| [CAT Auditor](agents/cat-auditor.agent.md)<br />[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect?url=vscode%3Achat-agent%2Finstall%3Furl%3Dhttps%3A%2F%2Fraw.githubusercontent.com%2Fmcbodge%2Fclowder%2Fmain%2Fagents%2Fcat-auditor.agent.md)<br />[![Install in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect?url=vscode-insiders%3Achat-agent%2Finstall%3Furl%3Dhttps%3A%2F%2Fraw.githubusercontent.com%2Fmcbodge%2Fclowder%2Fmain%2Fagents%2Fcat-auditor.agent.md) | Audits file(s), a folder, or a whole solution: maps the code, ranks findings worst-first, asks which to address, writes an execution-ready plan to `docs/plans/`, and recommends the executor to run it. Never edits code. | Plan Executor or Plan Executor (MudBlazor); optional: graphify, MudBlazor MCP |
 | [CAT Code Simplifier](agents/cat-code-simplifier.agent.md)<br />[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect?url=vscode%3Achat-agent%2Finstall%3Furl%3Dhttps%3A%2F%2Fraw.githubusercontent.com%2Fmcbodge%2Fclowder%2Fmain%2Fagents%2Fcat-code-simplifier.agent.md)<br />[![Install in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect?url=vscode-insiders%3Achat-agent%2Finstall%3Furl%3Dhttps%3A%2F%2Fraw.githubusercontent.com%2Fmcbodge%2Fclowder%2Fmain%2Fagents%2Fcat-code-simplifier.agent.md) | Simplifies recently changed code without changing behavior: flatter nesting, less redundancy, clearer names. Defaults to uncommitted changes. | - |
 | [CAT Debugger](agents/cat-debugger.agent.md)<br />[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect?url=vscode%3Achat-agent%2Finstall%3Furl%3Dhttps%3A%2F%2Fraw.githubusercontent.com%2Fmcbodge%2Fclowder%2Fmain%2Fagents%2Fcat-debugger.agent.md)<br />[![Install in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect?url=vscode-insiders%3Achat-agent%2Finstall%3Furl%3Dhttps%3A%2F%2Fraw.githubusercontent.com%2Fmcbodge%2Fclowder%2Fmain%2Fagents%2Fcat-debugger.agent.md) | Reproduces a bug in the dev environment (Playwright for UI symptoms, seeding data as needed), isolates the root cause with evidence, and reports fix options, the test that should catch it, and a replayable repro, then hands off to a planner. Leaves the code as it found it. | CAT Planner (DevOps) or CAT Planner, git-guard hook, playwright-cli; optional: azure-devops-cli, graphify, Aspire dashboard MCP |
 | [CAT PR Feedback Resolver](agents/cat-pr-feedback-resolver.agent.md)<br />[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect?url=vscode%3Achat-agent%2Finstall%3Furl%3Dhttps%3A%2F%2Fraw.githubusercontent.com%2Fmcbodge%2Fclowder%2Fmain%2Fagents%2Fcat-pr-feedback-resolver.agent.md)<br />[![Install in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect?url=vscode-insiders%3Achat-agent%2Finstall%3Furl%3Dhttps%3A%2F%2Fraw.githubusercontent.com%2Fmcbodge%2Fclowder%2Fmain%2Fagents%2Fcat-pr-feedback-resolver.agent.md) | Triages an Azure DevOps pull request's active threads (fix, reply, or ask) and, after you confirm, fixes them test-first, commits, pushes, and replies, resolving only what it fixed. | azure-devops-cli, TDD Cycle, git-guard hook; optional: playwright-cli |
@@ -147,7 +150,7 @@ The commands above install instructions to all three places that read them: VS C
 
 ## Install or update everything
 
-One script installs or updates everything — this repo's agents, instructions, skills, and hooks — then updates the external companions in [Prerequisites and companions](#prerequisites-and-companions) (playwright-cli, the azure-devops-cli skill, and graphify) when their CLIs are present. Run it from anywhere: it reuses the clone it runs from, or clones to `~/.copilot/.cache/clowder` on first run (override with `-RepoDir` / `$env:CLOWDER_DIR`, or `CLOWDER_DIR`). It clones or pulls first. Each tool it can't find is skipped with a note. This also serves as a first-time install; the manual [Install everything](#install-everything) steps remain for a hands-on setup.
+One script installs or updates everything — this repo's agents, instructions, skills, and hooks — then updates the external companions in [Prerequisites and companions](#prerequisites-and-companions) (playwright-cli, the azure-devops-cli skill, and graphify) when their CLIs are present. Run it from anywhere: it reuses the clone it runs from, or clones to `~/.copilot/.cache/clowder` on first run (override with `-RepoDir` / `$env:CLOWDER_DIR`, or `CLOWDER_DIR`). It clones or pulls first. Each tool it can't find is skipped with a note. To install into a repository's `.github/` instead of your user profile, pass `-ProjectDir <repo>` (PowerShell) or `--project <repo>` (bash); each run targets one location only — your user profile or that project's `.github/`, never both. This also serves as a first-time install; the manual [Install everything](#install-everything) steps remain for a hands-on setup.
 
 **Windows (PowerShell)** — from a clone, or bootstrap from anywhere without one:
 
@@ -164,6 +167,32 @@ bash clowder/scripts/update-all.sh
 # no clone yet (trusts and runs the remote script):
 curl -fsSL https://raw.githubusercontent.com/mcbodge/clowder/main/scripts/update-all.sh | bash
 ```
+
+## Install into a project (.github)
+
+A repository's `.github/` folder is read by GitHub Copilot in **Visual Studio** (the full IDE, not just VS Code) and by many other agents, so committing the pieces there shares them with everyone who opens the repo. Copy agents, instructions, and skills into the target repository; hooks are a VS Code feature and have no `.github` home.
+
+**Windows (PowerShell)** — set `$proj` to the repository root:
+
+```powershell
+$proj = 'C:\path\to\your\repo'
+New-Item -ItemType Directory -Force "$proj\.github\agents", "$proj\.github\instructions", "$proj\.github\skills" | Out-Null
+Copy-Item agents\*.agent.md "$proj\.github\agents"
+Copy-Item instructions\*.instructions.md "$proj\.github\instructions"
+Copy-Item skills\* "$proj\.github\skills" -Recurse -Force
+```
+
+**macOS and Linux** — set `PROJ` to the repository root:
+
+```bash
+PROJ=~/path/to/your/repo
+mkdir -p "$PROJ"/.github/{agents,instructions,skills}
+cp agents/*.agent.md "$PROJ"/.github/agents/
+cp instructions/*.instructions.md "$PROJ"/.github/instructions/
+cp -R skills/* "$PROJ"/.github/skills/
+```
+
+Or let the update script do it: `update-all` installs into a project's `.github/` instead of your user profile when you pass `-ProjectDir <repo>` (PowerShell) or `--project <repo>` (bash). Each run installs to one place only — your user profile or that project's `.github/`, never both.
 
 ## Prerequisites and companions
 
@@ -189,6 +218,21 @@ Visual Studio reads the same file formats with fewer features, and has no instal
 | Skills (18.5 or later) | `%USERPROFILE%\.copilot\skills\` or `.github/skills/` | Work as-is. |
 | Hooks | - | Not supported; the agents' written commit rules still apply. |
 | MCP servers | `%USERPROFILE%\.mcp.json`, or the solution's `.mcp.json` or `.vscode\mcp.json` | A repository's `.vscode/mcp.json` works in both editors, so one `mudblazor` entry there serves both. |
+
+## Other agents & IDEs
+
+Beyond GitHub Copilot (VS Code, Visual Studio, the CLI), these files work with other agents to varying degrees. The honest picture: **skills** (`SKILL.md`) and the repo-wide **instructions** port widely; the **agents** (`.agent.md`) are a Copilot / Visual Studio format that other tools don't read natively; and most non-Copilot tools take a single always-on rules file (`AGENTS.md`) or their own rules folder rather than this repo's per-file `applyTo` instructions, so instruction content copies but its front matter needs a small tweak to each tool's format.
+
+| Agent / IDE | Where it reads customizations | What drops in |
+| --- | --- | --- |
+| GitHub Copilot (VS Code, Visual Studio, CLI) | `.github/agents`, `.github/instructions`, `.github/skills`, `~/.copilot/`, the VS Code profile `prompts` folder | Everything, as-is |
+| Any agent that reads `AGENTS.md` (Antigravity, Zed, Amp, Jules, Codex, Aider, Junie, Goose) | `AGENTS.md` at the repo root (Antigravity also `.agents/rules/`) | Instruction content as one always-on file; skills via the tool's skills folder |
+| Cursor | `.cursor/rules/*.mdc` (and `AGENTS.md`) | Instruction content as `.mdc` rules (convert `applyTo` to `globs`) |
+| Windsurf | `.windsurf/rules/*.md` | Instruction content as rules |
+| Cline | `.clinerules/*.md` or `~/.cline/rules/` (and `AGENTS.md`); skills in `.agents/skills/` | Instruction content as rules; skills as-is |
+| Kiro | `.kiro/steering/*.md` | Instruction content as steering rules |
+
+Rule of thumb: commit the pieces to `.github/` for Copilot and Visual Studio ([above](#install-into-a-project-github)); add an `AGENTS.md` (or the matching rules file) for any other agent; and drop the skill folders into whatever skills directory the tool scans. Paths follow Ponytail's verified [agent-portability table](https://github.com/DietrichGebert/ponytail/blob/main/docs/agent-portability.md).
 
 ## About Ponytail
 
