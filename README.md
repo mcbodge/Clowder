@@ -13,6 +13,9 @@
 
 Custom agents, instructions, skills, and hooks for AI coding assistants that take a feature request or an Azure DevOps work item from refinement to a tested, reviewed commit. Built for GitHub Copilot in VS Code, Visual Studio, and the CLI, and usable from any agent that reads a repository's `.github/` customizations or `AGENTS.md` — Antigravity, Cursor, Windsurf, Cline, Kiro, and more (see [Other agents & IDEs](#other-agents--ides)). They're tuned for .NET, Blazor, and MudBlazor repositories on Azure DevOps; most pieces work with any stack.
 
+- [The 30-second version](#the-30-second-version)
+- [Two design pillars](#two-design-pillars)
+- [Token economics](#token-economics)
 - [How the team works](#how-the-team-works)
 - [🐱 Agents](#-agents)
 - [📋 Instructions](#-instructions)
@@ -27,6 +30,39 @@ Custom agents, instructions, skills, and hooks for AI coding assistants that tak
 - [About Ponytail](#about-ponytail)
 - [About the Karpathy guidelines](#about-the-karpathy-guidelines)
 - [License](#license)
+
+## The 30-second version
+
+One request, one assembly line:
+
+```
+Plan → Execute (test-first) → Review → ship
+```
+
+- A **Planner** interviews you and writes a deterministic plan file to `docs/plans/`. It never touches code.
+- The **Plan Executor** runs that plan task-by-task through the **TDD Cycle** worker, commits each validated change by explicit path, verifies web UI with Playwright, and gets one **Code Reviewer** pass.
+- A **Debugger** goes first when a bug's cause is unknown; a **PR Feedback Resolver** turns review comments into commits.
+- Everything else — **C# / MudBlazor Engineers**, **Code Simplifier**, the one-phase **TDD Red / Green / Refactor** — is a specialist you drive by hand.
+
+Guardrails are structural, not vibes: planners are read-only, execution is test-first, agents touch only the **dev** environment, commits stage by explicit path, and two **hooks** veto force-pushes, bulk staging, and production commands regardless of what the model decides.
+
+## Two design pillars
+
+### 🎯 Effectiveness
+
+- **Deterministic plans.** A plan is machine-parseable, every item carries an ID, and vague words (`etc.`, `as needed`, `TBD`) are banned in favor of exact values — so the executor never guesses.
+- **Test-first by contract.** Every behavior change goes Red → Green → Refactor; every bug is reproduced before it's fixed and re-verified after.
+- **Strict role boundaries.** Each agent states what it will *not* do: planners don't edit, reviewers don't commit, the executor doesn't invent scope.
+- **Evidence over vibes.** Every finding cites `path:Lnn`, a command result, or a trace.
+
+### 🪶 Token efficiency by design
+
+- **One agent per conversation.** Only the selected agent's prompt loads, so text repeated across agents costs **zero** runtime tokens. Specialists set `disable-model-invocation`, so their descriptions don't ride along on routing either.
+- **Section-reference prompts.** Rules are stated once and referenced by tag (`<hard_rules>` → `<dev_validation>`) instead of restated.
+- **Just-in-time context.** Instructions attach only when an agent edits a matching file; skills load only when a request needs them; hooks never enter the context at all.
+- **Compaction-proof memory.** Long runs persist state to session memory and re-read a one-line summary, not the raw files, after a compaction.
+
+See [Token economics](#token-economics) for exactly what enters a context window, and when.
 
 ## How the team works
 
@@ -117,6 +153,37 @@ Hooks run a script at a point in an agent's lifecycle and enforce a rule regardl
 **Install git-guard** by copying `git-guard.ps1` and `git-guard.sh` to `~/.copilot/hooks/`. The Plan Executor, PR Feedback Resolver, TDD Cycle, and Debugger declare it in their front matter. A front-matter hook runs only while its own agent is active, not inside the subagents it calls, which is why TDD Cycle declares it as well. To guard every agent, also copy `hooks.json` to `~/.copilot/hooks/git-guard.json`. On macOS and Linux, run `chmod +x ~/.copilot/hooks/git-guard.sh`.
 
 **Install env-guard** the same way: copy `env-guard.ps1` and `env-guard.sh` to `~/.copilot/hooks/`, and `hooks.json` to `~/.copilot/hooks/env-guard.json` to guard every agent. The Plan Executor, PR Feedback Resolver, TDD Cycle, and Debugger declare it in their front matter alongside git-guard. On macOS and Linux, run `chmod +x ~/.copilot/hooks/env-guard.sh`. It reads the target environment from the command alone, so a command with no environment selector counts as Development and passes untouched; set `ASPNETCORE_ENVIRONMENT`/`DOTNET_ENVIRONMENT`, `--environment`, or reference an `appsettings.<Env>.json` to protect a run. Because it can't correlate a separate `export`/`$env:` line with a later run, keep the environment and the command together (for example `ASPNETCORE_ENVIRONMENT=Production dotnet run`).
+
+## Token economics
+
+The team is built so a context window holds only what the current turn needs. What actually loads:
+
+| Piece | Loads when | Always-on cost |
+| --- | --- | --- |
+| Agent prompt | You pick the agent, or one of the three model-invocable agents is handed off | None — only one loads per conversation |
+| Instruction file | An agent edits a file matching its `applyTo` | None in chats that don't touch those files |
+| Skill | A request matches the skill | Description only, and only for installed skills |
+| Hook | Never — it runs as a script at a lifecycle point | None |
+| Session memory | An agent re-reads its own notes after a compaction | A one-line summary, not raw files |
+
+Because only one agent loads per conversation, the repeated dev-environment and graph-first passages across agents **never co-occur** — deduplicating them across files would save nothing at runtime. The real levers are per-prompt density (section references, banned filler, tables over prose) and short always-on description strings.
+
+### Agent registry & token weight
+
+Weight is the relative size of the prompt that loads when the agent runs (●○○ light · ●●○ medium · ●●● heavy). None of it rides along while the agent is idle.
+
+| Agent | Role | Weight |
+| --- | --- | --- |
+| Planner · Planner (DevOps) | Research + interview → deterministic plan | ●●● |
+| Plan Executor | Run the plan test-first, commit, review, update work items | ●●● |
+| Auditor | Rank findings worst-first → plan | ●●● |
+| Debugger | Reproduce → root-cause → hand off | ●●○ |
+| PR Feedback Resolver | Review comments → commits + replies | ●●○ |
+| TDD Cycle | One task, Red → Green → Refactor | ●●○ |
+| Code Reviewer | Read-only review by severity | ●○○ |
+| C# · MudBlazor Engineer | Hands-on implementation | ●○○ |
+| Code Simplifier | Behavior-preserving cleanup | ●○○ |
+| TDD Red · Green · Refactor | One phase each | ●○○ |
 
 ## Install everything
 

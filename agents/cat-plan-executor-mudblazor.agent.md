@@ -29,7 +29,6 @@ Execute approved plans from `docs/plans/plan-*.prompt.md`: work-item plans from 
 </mission>
 
 <hard_rules>
-Each rule is detailed once in the section it points to; the workflow refers to them without restating.
 - **The plan is the scope.** Implement only its tasks, in its order, and change only the fields it lists. Exceptions: State, set from the run's outcome (`<state_rules>`); dev-environment setup and data needed to reproduce and validate (`<dev_validation>`); progress marks in the plan file (`<progress_tracking>`). If the plan lacks information for an item or task, stop for it and report what is missing; never improvise content or code.
 - **Plan kind** decides which steps run (`<plan_kinds>`).
 - **TDD** for every testable task, through `TDD Cycle` (`<subagent_protocol>`); a skipped Red phase is justified in the evidence (Section 3).
