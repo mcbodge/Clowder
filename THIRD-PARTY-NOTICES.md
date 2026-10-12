@@ -10,6 +10,7 @@ Some files in this repository adapt material from the projects below. The adapte
 - Adapted in:
   - `agents/cat-tdd-red.agent.md`, `agents/cat-tdd-green.agent.md`, `agents/cat-tdd-refactor.agent.md`, and `agents/cat-tdd-cycle.agent.md`, from the TDD Red, Green, and Refactor Phase agents.
   - `agents/cat-csharp-engineer.agent.md`, `instructions/csharp.instructions.md`, and `instructions/csharp-tests.instructions.md`, from the C# Expert agent.
+  - `agents/cat-csharp-mcp-engineer.agent.md`, from the C# MCP Server Expert agent in the `csharp-mcp-development` plugin.
   - The plan infrastructure of `agents/cat-planner.agent.md`, `agents/cat-planner-devops.agent.md`, and `agents/cat-plan-executor.agent.md` (plan files with front matter and status values, `{purpose}-{component}-{version}` file names, `REQ-`/`TASK-`-style ID prefixes, phase task tables with Completed and Date columns, and the section template), inspired by and adapted from [`agents/implementation-plan.agent.md`](https://github.com/github/awesome-copilot/blob/main/agents/implementation-plan.agent.md) (Implementation Plan Generation Mode).
 
 ## Ponytail
