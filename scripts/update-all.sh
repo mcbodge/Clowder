@@ -61,12 +61,15 @@ fi
 mkdir -p "$COPILOT/agents" "$COPILOT/skills" "$COPILOT/hooks" "$COPILOT/instructions"
 cp "$REPO"/agents/*.agent.md "$COPILOT/agents/"
 cp -R "$REPO"/skills/* "$COPILOT/skills/"
-cp "$REPO"/hooks/git-guard/git-guard.ps1 "$REPO"/hooks/git-guard/git-guard.sh "$COPILOT/hooks/"
-chmod +x "$COPILOT/hooks/git-guard.sh"
+cp "$REPO"/hooks/git-guard/git-guard.ps1 "$REPO"/hooks/git-guard/git-guard.sh "$REPO"/hooks/env-guard/env-guard.ps1 "$REPO"/hooks/env-guard/env-guard.sh "$COPILOT/hooks/"
+chmod +x "$COPILOT/hooks/git-guard.sh" "$COPILOT/hooks/env-guard.sh"
 cp "$REPO"/instructions/*.instructions.md "$COPILOT/instructions/"
-# Refresh the global git-guard hook only if you opted into it.
+# Refresh the global git-guard and env-guard hooks only if you opted into them.
 if [ -f "$COPILOT/hooks/git-guard.json" ]; then
   cp "$REPO/hooks/git-guard/hooks.json" "$COPILOT/hooks/git-guard.json"
+fi
+if [ -f "$COPILOT/hooks/env-guard.json" ]; then
+  cp "$REPO/hooks/env-guard/hooks.json" "$COPILOT/hooks/env-guard.json"
 fi
 
 # VS Code / Insiders user prompts (instructions with applyTo).

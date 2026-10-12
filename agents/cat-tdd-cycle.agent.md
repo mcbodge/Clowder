@@ -9,6 +9,10 @@ hooks:
       command: 'sh "$HOME/.copilot/hooks/git-guard.sh"'
       windows: 'powershell -NoProfile -ExecutionPolicy Bypass -Command "& ([IO.Path]::Combine([Environment]::GetFolderPath(''UserProfile''), ''.copilot'', ''hooks'', ''git-guard.ps1''))"'
       timeout: 10
+    - type: command
+      command: 'sh "$HOME/.copilot/hooks/env-guard.sh"'
+      windows: 'powershell -NoProfile -ExecutionPolicy Bypass -Command "& ([IO.Path]::Combine([Environment]::GetFolderPath(''UserProfile''), ''.copilot'', ''hooks'', ''env-guard.ps1''))"'
+      timeout: 10
 ---
 
 # TDD Cycle

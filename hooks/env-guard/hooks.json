@@ -1,0 +1,12 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": "sh \"$HOME/.copilot/hooks/env-guard.sh\"",
+        "windows": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"& ([IO.Path]::Combine([Environment]::GetFolderPath('UserProfile'), '.copilot', 'hooks', 'env-guard.ps1'))\"",
+        "timeout": 10
+      }
+    ]
+  }
+}
