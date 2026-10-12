@@ -2,8 +2,7 @@
 # Install or update the Clowder and its external companion tools.
 #
 # Clones this repository if it isn't present yet, otherwise pulls the latest, then copies the
-# agents, instructions, skills, and hooks into your user profile, removes copies a rename
-# superseded so the picker never lists two of the same agent, and updates playwright-cli, the
+# agents, instructions, skills, and hooks into your user profile, and updates playwright-cli, the
 # azure-devops-cli skill, and graphify when their CLIs are installed. Run it from anywhere,
 # even outside a clone: it reuses the clone it runs from, or clones to
 # $HOME/.copilot/.cache/clowder. Override with CLOWDER_DIR / _URL.
@@ -57,17 +56,7 @@ for dir in "$BASE/Code/User/prompts" "$BASE/Code - Insiders/User/prompts"; do
   if [ -d "$dir" ]; then cp "$REPO"/instructions/*.instructions.md "$dir/"; fi
 done
 
-# 4. Remove copies superseded by the cat- rename so the picker never lists two.
-for name in code-reviewer code-simplifier csharp-engineer debugger implementation-planner \
-            mudblazor-engineer plan-executor pr-feedback-resolver tdd-cycle tdd-green tdd-red \
-            tdd-refactor work-item-planner \
-            cat-implementation-planner cat-implementation-planner-mudblazor \
-            cat-work-item-planner cat-work-item-planner-mudblazor; do
-  rm -f "$COPILOT/agents/$name.agent.md"
-done
-rm -rf "$COPILOT/skills/release-notes"
-
-# 5. Update external companion tools when their CLIs are present (best effort).
+# 4. Update external companion tools when their CLIs are present (best effort).
 if command -v npm >/dev/null 2>&1; then
   npm install -g @playwright/cli@latest || echo "playwright-cli update failed." >&2
   if command -v playwright-cli >/dev/null 2>&1; then

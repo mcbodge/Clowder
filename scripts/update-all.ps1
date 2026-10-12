@@ -3,8 +3,7 @@
   Install or update the Clowder and its external companion tools.
 .DESCRIPTION
   Clones this repository if it isn't present yet, otherwise pulls the latest, then copies the
-  agents, instructions, skills, and hooks into your user profile, removes copies a rename
-  superseded so the picker never lists two of the same agent, and updates playwright-cli, the
+  agents, instructions, skills, and hooks into your user profile, and updates playwright-cli, the
   azure-devops-cli skill, and graphify when their CLIs are installed. Run it from anywhere,
   even from outside a clone.
 .PARAMETER RepoDir
@@ -73,16 +72,7 @@ Copy-Instructions "$copilot\instructions"
 Copy-Instructions "$env:APPDATA\Code\User\prompts"
 Copy-Instructions "$env:APPDATA\Code - Insiders\User\prompts"
 
-# 4. Remove copies superseded by the cat- rename so the picker never lists two.
-$old = 'code-reviewer','code-simplifier','csharp-engineer','debugger','implementation-planner',
-       'mudblazor-engineer','plan-executor','pr-feedback-resolver','tdd-cycle','tdd-green',
-       'tdd-red','tdd-refactor','work-item-planner',
-       'cat-implementation-planner','cat-implementation-planner-mudblazor',
-       'cat-work-item-planner','cat-work-item-planner-mudblazor'
-foreach ($name in $old) { Remove-Item "$copilot\agents\$name.agent.md" -ErrorAction SilentlyContinue }
-Remove-Item "$copilot\skills\release-notes" -Recurse -ErrorAction SilentlyContinue
-
-# 5. Update external companion tools when their CLIs are present.
+# 4. Update external companion tools when their CLIs are present.
 if (Get-Command npm -ErrorAction SilentlyContinue) {
     npm install -g '@playwright/cli@latest'
     if (Get-Command playwright-cli -ErrorAction SilentlyContinue) { playwright-cli install --skills }

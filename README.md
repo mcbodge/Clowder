@@ -122,11 +122,11 @@ Clone the repository and copy each folder to its user-level location. Run the sa
 git clone https://github.com/mcbodge/clowder.git
 Set-Location clowder
 $copilot = Join-Path $HOME '.copilot'
-New-Item -ItemType Directory -Force "$copilot\agents", "$copilot\skills", "$copilot\hooks", "$env:APPDATA\Code\User\prompts" | Out-Null
+New-Item -ItemType Directory -Force "$copilot\agents", "$copilot\skills", "$copilot\hooks", "$copilot\instructions", "$env:APPDATA\Code\User\prompts", "$env:APPDATA\Code - Insiders\User\prompts" | Out-Null
 Copy-Item agents\*.agent.md "$copilot\agents"
 Copy-Item skills\* "$copilot\skills" -Recurse -Force
 Copy-Item hooks\git-guard\git-guard.ps1, hooks\git-guard\git-guard.sh "$copilot\hooks"
-Copy-Item instructions\*.instructions.md "$env:APPDATA\Code\User\prompts"
+foreach ($d in "$copilot\instructions", "$env:APPDATA\Code\User\prompts", "$env:APPDATA\Code - Insiders\User\prompts") { Copy-Item instructions\*.instructions.md $d }
 ```
 
 **macOS and Linux**
@@ -134,19 +134,20 @@ Copy-Item instructions\*.instructions.md "$env:APPDATA\Code\User\prompts"
 ```bash
 git clone https://github.com/mcbodge/clowder.git
 cd clowder
-mkdir -p ~/.copilot/agents ~/.copilot/skills ~/.copilot/hooks
+mkdir -p ~/.copilot/agents ~/.copilot/skills ~/.copilot/hooks ~/.copilot/instructions
 cp agents/*.agent.md ~/.copilot/agents/
 cp -R skills/* ~/.copilot/skills/
 cp hooks/git-guard/git-guard.* ~/.copilot/hooks/ && chmod +x ~/.copilot/hooks/git-guard.sh
-PROMPTS="$HOME/Library/Application Support/Code/User/prompts"   # Linux: $HOME/.config/Code/User/prompts
-mkdir -p "$PROMPTS" && cp instructions/*.instructions.md "$PROMPTS/"
+cp instructions/*.instructions.md ~/.copilot/instructions/
+BASE="$HOME/Library/Application Support"   # Linux: $HOME/.config
+for ed in "Code" "Code - Insiders"; do mkdir -p "$BASE/$ed/User/prompts" && cp instructions/*.instructions.md "$BASE/$ed/User/prompts/"; done
 ```
 
-For VS Code Insiders, the instructions folder is `Code - Insiders` instead of `Code`. Copilot CLI and Agent Host sessions read user instructions from `~/.copilot/instructions/` rather than the VS Code profile.
+The commands above install instructions to all three places that read them: VS Code's and Insiders' profile `prompts` folders, and `~/.copilot/instructions/` for the Copilot CLI and Agent Host.
 
 ## Install or update everything
 
-One script installs or updates everything — this repo's agents, instructions, skills, and hooks — then updates the external companions in [Prerequisites and companions](#prerequisites-and-companions) (playwright-cli, the azure-devops-cli skill, and graphify) when their CLIs are present. Run it from anywhere: it reuses the clone it runs from, or clones to `~/.copilot/.cache/clowder` on first run (override with `-RepoDir` / `$env:CLOWDER_DIR`, or `CLOWDER_DIR`). It clones or pulls first and removes any copy a rename superseded, so the picker never lists two of the same agent. Each tool it can't find is skipped with a note. This also serves as a first-time install; the manual [Install everything](#install-everything) steps remain for a hands-on setup.
+One script installs or updates everything — this repo's agents, instructions, skills, and hooks — then updates the external companions in [Prerequisites and companions](#prerequisites-and-companions) (playwright-cli, the azure-devops-cli skill, and graphify) when their CLIs are present. Run it from anywhere: it reuses the clone it runs from, or clones to `~/.copilot/.cache/clowder` on first run (override with `-RepoDir` / `$env:CLOWDER_DIR`, or `CLOWDER_DIR`). It clones or pulls first. Each tool it can't find is skipped with a note. This also serves as a first-time install; the manual [Install everything](#install-everything) steps remain for a hands-on setup.
 
 **Windows (PowerShell)** — from a clone, or bootstrap from anywhere without one:
 
