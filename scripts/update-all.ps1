@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Install or update the Copilot Agent Team and its external companion tools.
+  Install or update the Clowder and its external companion tools.
 .DESCRIPTION
   Clones this repository if it isn't present yet, otherwise pulls the latest, then copies the
   agents, instructions, skills, and hooks into your user profile, removes copies a rename
@@ -9,13 +9,13 @@
   even from outside a clone.
 .PARAMETER RepoDir
   Where the repository lives or should be cloned. Defaults to the clone this script runs from,
-  then to $HOME\.copilot\.cache\copilot-agent-team. Also set by $env:COPILOT_AGENT_TEAM_DIR.
+  then to $HOME\.copilot\.cache\clowder. Also set by $env:CLOWDER_DIR.
 .PARAMETER Url
-  Git URL to clone from when RepoDir has no clone yet. Also set by $env:COPILOT_AGENT_TEAM_URL.
+  Git URL to clone from when RepoDir has no clone yet. Also set by $env:CLOWDER_URL.
 #>
 param(
-    [string]$RepoDir = $env:COPILOT_AGENT_TEAM_DIR,
-    [string]$Url     = $(if ($env:COPILOT_AGENT_TEAM_URL) { $env:COPILOT_AGENT_TEAM_URL } else { 'https://github.com/mcbodge/copilot-agent-team.git' })
+    [string]$RepoDir = $env:CLOWDER_DIR,
+    [string]$Url     = $(if ($env:CLOWDER_URL) { $env:CLOWDER_URL } else { 'https://github.com/mcbodge/clowder.git' })
 )
 
 # Native tools (git/npm/gh/uv) print progress to stderr; keep that from aborting the run.
@@ -32,7 +32,7 @@ if (-not $RepoDir) {
             $RepoDir = $fromScript
         }
     }
-    if (-not $RepoDir) { $RepoDir = Join-Path (Join-Path $copilot '.cache') 'copilot-agent-team' }
+    if (-not $RepoDir) { $RepoDir = Join-Path (Join-Path $copilot '.cache') 'clowder' }
 }
 $repo = $RepoDir
 
@@ -48,14 +48,14 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
 
 # 2. Clone on first run, otherwise pull the latest.
 if (Test-Path (Join-Path $repo '.git')) {
-    Write-Host "==> Updating copilot-agent-team in $repo" -ForegroundColor Cyan
+    Write-Host "==> Updating clowder in $repo" -ForegroundColor Cyan
     git -C $repo pull --ff-only
     if ($LASTEXITCODE -ne 0) { Write-Warning "git pull exited $LASTEXITCODE; continuing with the copy." }
 } elseif ((Test-Path $repo) -and (Get-ChildItem -Force $repo | Select-Object -First 1)) {
     Write-Error "$repo exists but is not a git clone; pass -RepoDir or remove it."
     exit 1
 } else {
-    Write-Host "==> Cloning copilot-agent-team into $repo" -ForegroundColor Cyan
+    Write-Host "==> Cloning clowder into $repo" -ForegroundColor Cyan
     New-Item -ItemType Directory -Force (Split-Path -Parent $repo) | Out-Null
     git clone $Url $repo
     if ($LASTEXITCODE -ne 0) { Write-Error "git clone failed with exit $LASTEXITCODE."; exit 1 }
