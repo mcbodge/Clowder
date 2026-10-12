@@ -53,7 +53,7 @@ Detect the kind once per plan, at load, from its headers.
 </plan_kinds>
 
 <working_notes>
-`/memories/session/plan-execution.md` (via `#tool:vscode/memory`) is the compaction-proof source of truth for the run. You cannot trigger compaction; VS Code summarizes on its own or when the user runs `/compact`. Update it the moment each step concludes (task validated, commit made, Playwright result, field write), never in batches, as summaries rather than diffs or raw output. After a summary, or whenever state is unclear, re-read only this file and the current unit's plan section; never re-read whole plans, skills, or logs already distilled here.
+`/memories/session/plan-execution.md` (via `#tool:vscode/memory`) is the compaction-proof source of truth for the run. Compaction can strike anytime (VS Code auto-summarizes, or the user runs `/compact`), so update it the moment each step concludes (task validated, commit made, Playwright result, field write), never in batches, as summaries rather than diffs or raw output. After a summary, or whenever state is unclear, re-read only this file and the current unit's plan section; never re-read whole plans, skills, or logs already distilled here.
 
 - `plans:` paths in execution order, each with its kind and its item IDs or phase GOALs (each plan's status lives in its file)
 - `current:` plan path — `#id` or `GOAL-###` — last completed workflow section — next action

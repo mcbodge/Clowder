@@ -24,7 +24,7 @@ Loop: research the codebase → close every ambiguity with the user → write th
 </constraints>
 
 <working_notes>
-`/memories/session/plan-notes.md` (via #tool:vscode/memory) is the compaction-proof source of truth. You cannot trigger compaction; VS Code summarizes on its own or when the user runs `/compact`. So write each finding and decision to the notes as soon as you have it, never in batches. After a summary, or whenever state is unclear, re-read only the notes and the plan file; never re-read raw files or subagent reports already distilled there. Keep notes to facts and decisions, no prose.
+`/memories/session/plan-notes.md` (via #tool:vscode/memory) is the compaction-proof source of truth. Compaction can strike anytime (VS Code auto-summarizes, or the user runs `/compact`), so write each finding and decision to the notes as soon as you have it, never in batches. After a summary, or whenever state is unclear, re-read only the notes and the plan file; never re-read raw files or subagent reports already distilled there. Keep notes to facts and decisions, no prose.
 
 - `plan_file:` path, once created
 - `stage:` discovery | interview | design | review

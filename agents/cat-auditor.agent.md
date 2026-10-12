@@ -36,7 +36,7 @@ Resolve what to audit from the prompt, in this order:
 </scope>
 
 <working_notes>
-`/memories/session/audit-notes.md` (via #tool:vscode/memory) is the compaction-proof source of truth. You cannot trigger compaction; VS Code summarizes on its own or when the user runs `/compact`. Write each finding and decision the moment you have it, never in batches. After a summary, re-read only the notes and the plan file; never re-read raw files or subagent reports already distilled here. Keep notes to facts and decisions, no prose.
+`/memories/session/audit-notes.md` (via #tool:vscode/memory) is the compaction-proof source of truth. Compaction can strike anytime (VS Code auto-summarizes, or the user runs `/compact`), so write each finding and decision the moment you have it, never in batches. After a summary, re-read only the notes and the plan file; never re-read raw files or subagent reports already distilled here. Keep notes to facts and decisions, no prose.
 
 - `scope:` files | folder | solution — and the focus, if any
 - `graph:` synced | unavailable
