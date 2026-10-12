@@ -7,8 +7,6 @@
 
 # Clowder
 
-> **CCAATT** — a **C**lowder of **C**oding **A**gents **A**wesome-ish **T**eam and **T**ools.
-
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
 Custom agents, instructions, skills, and hooks for AI coding assistants that take a feature request or an Azure DevOps work item from refinement to a tested, reviewed commit. Built for GitHub Copilot in VS Code, Visual Studio, and the CLI, and usable from any agent that reads a repository's `.github/` customizations or `AGENTS.md` — Antigravity, Cursor, Windsurf, Cline, Kiro, and more (see [Other agents & IDEs](#other-agents--ides)). They're tuned for .NET, Blazor, and MudBlazor repositories on Azure DevOps; most pieces work with any stack.
