@@ -22,6 +22,15 @@ while [ $# -gt 0 ]; do
   shift || true
 done
 
+# Create the destination (unless the p flag) and copy sources into it.
+# Usage: install_set <dest> <flags: r=recurse, p=only-if-present> <source>...
+install_set() {
+  local dest="$1" flags="$2"; shift 2
+  if [[ "$flags" == *p* ]] && [ ! -e "$dest" ]; then return 0; fi
+  if [[ "$flags" != *p* ]]; then mkdir -p "$dest"; fi
+  if [[ "$flags" == *r* ]]; then cp -R "$@" "$dest"; else cp "$@" "$dest"; fi
+}
+
 # 1. Locate the repo: explicit override, the clone this script runs from, or the cache clone.
 if [ -z "$REPO" ]; then
   if [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "${BASH_SOURCE[0]}" ]; then
@@ -49,28 +58,22 @@ fi
 if [ -n "$PROJECT" ]; then
   [ -d "$PROJECT" ] || { echo "--project '$PROJECT' not found." >&2; exit 1; }
   GH="$PROJECT/.github"
-  mkdir -p "$GH/agents" "$GH/instructions" "$GH/skills"
-  cp "$REPO"/agents/*.agent.md "$GH/agents/"
-  cp "$REPO"/instructions/*.instructions.md "$GH/instructions/"
-  cp -R "$REPO"/skills/* "$GH/skills/"
+  install_set "$GH/agents" "" "$REPO"/agents/*.agent.md
+  install_set "$GH/instructions" "" "$REPO"/instructions/*.instructions.md
+  install_set "$GH/skills" "r" "$REPO"/skills/*
   echo "==> Installed into $GH (agents, instructions, skills)."
   exit 0
 fi
 
 # 3. Copy this repo's pieces into the user profile.
-mkdir -p "$COPILOT/agents" "$COPILOT/skills" "$COPILOT/hooks" "$COPILOT/instructions"
-cp "$REPO"/agents/*.agent.md "$COPILOT/agents/"
-cp -R "$REPO"/skills/* "$COPILOT/skills/"
-cp "$REPO"/hooks/git-guard/git-guard.ps1 "$REPO"/hooks/git-guard/git-guard.sh "$REPO"/hooks/env-guard/env-guard.ps1 "$REPO"/hooks/env-guard/env-guard.sh "$REPO"/hooks/planner-write-guard/planner-write-guard.ps1 "$REPO"/hooks/planner-write-guard/planner-write-guard.sh "$COPILOT/hooks/"
+install_set "$COPILOT/agents" "" "$REPO"/agents/*.agent.md
+install_set "$COPILOT/skills" "r" "$REPO"/skills/*
+install_set "$COPILOT/hooks" "" "$REPO"/hooks/git-guard/git-guard.ps1 "$REPO"/hooks/git-guard/git-guard.sh "$REPO"/hooks/env-guard/env-guard.ps1 "$REPO"/hooks/env-guard/env-guard.sh "$REPO"/hooks/planner-write-guard/planner-write-guard.ps1 "$REPO"/hooks/planner-write-guard/planner-write-guard.sh
 chmod +x "$COPILOT/hooks/git-guard.sh" "$COPILOT/hooks/env-guard.sh" "$COPILOT/hooks/planner-write-guard.sh"
-cp "$REPO"/instructions/*.instructions.md "$COPILOT/instructions/"
+install_set "$COPILOT/instructions" "" "$REPO"/instructions/*.instructions.md
 # Refresh the global git-guard and env-guard hooks only if you opted into them.
-if [ -f "$COPILOT/hooks/git-guard.json" ]; then
-  cp "$REPO/hooks/git-guard/hooks.json" "$COPILOT/hooks/git-guard.json"
-fi
-if [ -f "$COPILOT/hooks/env-guard.json" ]; then
-  cp "$REPO/hooks/env-guard/hooks.json" "$COPILOT/hooks/env-guard.json"
-fi
+install_set "$COPILOT/hooks/git-guard.json" "p" "$REPO/hooks/git-guard/hooks.json"
+install_set "$COPILOT/hooks/env-guard.json" "p" "$REPO/hooks/env-guard/hooks.json"
 
 # VS Code / Insiders user prompts (instructions with applyTo).
 case "$(uname -s)" in
@@ -78,7 +81,7 @@ case "$(uname -s)" in
   *)      BASE="$HOME/.config" ;;
 esac
 for dir in "$BASE/Code/User/prompts" "$BASE/Code - Insiders/User/prompts"; do
-  if [ -d "$dir" ]; then cp "$REPO"/instructions/*.instructions.md "$dir/"; fi
+  install_set "$dir" "p" "$REPO"/instructions/*.instructions.md
 done
 
 # 4. Update external companion tools when their CLIs are present (best effort).

@@ -19,9 +19,7 @@ Custom agents, instructions, skills, and hooks for AI coding assistants that tak
 - [📋 Instructions](#-instructions)
 - [🎯 Skills](#-skills)
 - [🪝 Hooks](#-hooks)
-- [Install everything](#install-everything)
 - [Install or update everything](#install-or-update-everything)
-- [Install into a project (.github)](#install-into-a-project-github)
 - [Prerequisites and companions](#prerequisites-and-companions)
 - [Visual Studio 2026](#visual-studio-2026)
 - [Other agents & IDEs](#other-agents--ides)
@@ -139,6 +137,7 @@ Skills load only when a request needs them. Install with the [GitHub CLI](https:
 | Skill | Description | Install |
 | --- | --- | --- |
 | [cat-release-notes](skills/cat-release-notes/SKILL.md) | Drafts user-facing release notes from the commits between two git refs (default: latest tag to `HEAD`), grouped by work item and change type, and matches an existing `CHANGELOG.md` format. | `gh skills install mcbodge/clowder cat-release-notes` |
+| [cat-install](skills/cat-install/SKILL.md) | Installs or updates the Clowder — agents, instructions, skills, hooks, and companion tools — into your user profile or a project's `.github/`, by running the `update-all` script. | `gh skills install mcbodge/clowder cat-install` |
 
 ## 🪝 Hooks
 
@@ -187,7 +186,30 @@ Weight is the relative size of the prompt that loads when the agent runs (●○
 | Code Simplifier | Behavior-preserving cleanup | ●○○ |
 | TDD Red · Green · Refactor | One phase each | ●○○ |
 
-## Install everything
+## Install or update everything
+
+One script installs or updates everything — this repo's agents, instructions, skills, and hooks — then updates the external companions in [Prerequisites and companions](#prerequisites-and-companions) (playwright-cli, the azure-devops-cli skill, and graphify) when their CLIs are present. Run it from anywhere: it reuses the clone it runs from, or clones to `~/.copilot/.cache/clowder` on first run (override with `-RepoDir` / `$env:CLOWDER_DIR`, or `CLOWDER_DIR`). It clones or pulls first, so the same command is both a first-time install and an update. Each tool it can't find is skipped with a note. To install into a repository's `.github/` instead of your user profile, pass `-ProjectDir <repo>` (PowerShell) or `--project <repo>` (bash); each run targets one location only — your user profile or that project's `.github/`, never both. From the chat, the [cat-install](skills/cat-install/SKILL.md) skill runs it for you.
+
+**Windows (PowerShell)** — from a clone, or bootstrap from anywhere without one:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File clowder\scripts\update-all.ps1
+# no clone yet (trusts and runs the remote script):
+irm https://raw.githubusercontent.com/mcbodge/clowder/main/scripts/update-all.ps1 | iex
+```
+
+**macOS and Linux** — from a clone, or bootstrap from anywhere without one:
+
+```bash
+bash clowder/scripts/update-all.sh
+# no clone yet (trusts and runs the remote script):
+curl -fsSL https://raw.githubusercontent.com/mcbodge/clowder/main/scripts/update-all.sh | bash
+```
+
+The script copies instructions to all three places that read them: VS Code's and Insiders' profile `prompts` folders, and `~/.copilot/instructions/` for the Copilot CLI and Agent Host. Project mode writes to a repository's `.github/` — read by GitHub Copilot in **Visual Studio** and many other agents — but installs only agents, instructions, and skills, since hooks are a VS Code feature with no `.github` home.
+
+<details>
+<summary>Prefer to copy by hand? Manual user-profile and project installs</summary>
 
 Clone the repository and copy each folder to its user-level location. Run the same commands again after `git pull` to update; one-click installs are copies too. Copying never deletes: if you installed earlier versions under other file names, remove them, or the agent picker lists both.
 
@@ -218,31 +240,7 @@ BASE="$HOME/Library/Application Support"   # Linux: $HOME/.config
 for ed in "Code" "Code - Insiders"; do mkdir -p "$BASE/$ed/User/prompts" && cp instructions/*.instructions.md "$BASE/$ed/User/prompts/"; done
 ```
 
-The commands above install instructions to all three places that read them: VS Code's and Insiders' profile `prompts` folders, and `~/.copilot/instructions/` for the Copilot CLI and Agent Host.
-
-## Install or update everything
-
-One script installs or updates everything — this repo's agents, instructions, skills, and hooks — then updates the external companions in [Prerequisites and companions](#prerequisites-and-companions) (playwright-cli, the azure-devops-cli skill, and graphify) when their CLIs are present. Run it from anywhere: it reuses the clone it runs from, or clones to `~/.copilot/.cache/clowder` on first run (override with `-RepoDir` / `$env:CLOWDER_DIR`, or `CLOWDER_DIR`). It clones or pulls first. Each tool it can't find is skipped with a note. To install into a repository's `.github/` instead of your user profile, pass `-ProjectDir <repo>` (PowerShell) or `--project <repo>` (bash); each run targets one location only — your user profile or that project's `.github/`, never both. This also serves as a first-time install; the manual [Install everything](#install-everything) steps remain for a hands-on setup.
-
-**Windows (PowerShell)** — from a clone, or bootstrap from anywhere without one:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File clowder\scripts\update-all.ps1
-# no clone yet (trusts and runs the remote script):
-irm https://raw.githubusercontent.com/mcbodge/clowder/main/scripts/update-all.ps1 | iex
-```
-
-**macOS and Linux** — from a clone, or bootstrap from anywhere without one:
-
-```bash
-bash clowder/scripts/update-all.sh
-# no clone yet (trusts and runs the remote script):
-curl -fsSL https://raw.githubusercontent.com/mcbodge/clowder/main/scripts/update-all.sh | bash
-```
-
-## Install into a project (.github)
-
-A repository's `.github/` folder is read by GitHub Copilot in **Visual Studio** (the full IDE, not just VS Code) and by many other agents, so committing the pieces there shares them with everyone who opens the repo. Copy agents, instructions, and skills into the target repository; hooks are a VS Code feature and have no `.github` home.
+For a project's `.github/` instead of your user profile, copy agents, instructions, and skills into the target repository (hooks have no `.github` home):
 
 **Windows (PowerShell)** — set `$proj` to the repository root:
 
@@ -264,7 +262,7 @@ cp instructions/*.instructions.md "$PROJ"/.github/instructions/
 cp -R skills/* "$PROJ"/.github/skills/
 ```
 
-Or let the update script do it: `update-all` installs into a project's `.github/` instead of your user profile when you pass `-ProjectDir <repo>` (PowerShell) or `--project <repo>` (bash). Each run installs to one place only — your user profile or that project's `.github/`, never both.
+</details>
 
 ## Prerequisites and companions
 
@@ -304,7 +302,7 @@ Beyond GitHub Copilot (VS Code, Visual Studio, the CLI), these files work with o
 | Cline | `.clinerules/*.md` or `~/.cline/rules/` (and `AGENTS.md`); skills in `.agents/skills/` | Instruction content as rules; skills as-is |
 | Kiro | `.kiro/steering/*.md` | Instruction content as steering rules |
 
-Rule of thumb: commit the pieces to `.github/` for Copilot and Visual Studio ([above](#install-into-a-project-github)); add an `AGENTS.md` (or the matching rules file) for any other agent; and drop the skill folders into whatever skills directory the tool scans. Paths follow Ponytail's verified [agent-portability table](https://github.com/DietrichGebert/ponytail/blob/main/docs/agent-portability.md).
+Rule of thumb: commit the pieces to `.github/` for Copilot and Visual Studio ([above](#install-or-update-everything)); add an `AGENTS.md` (or the matching rules file) for any other agent; and drop the skill folders into whatever skills directory the tool scans. Paths follow Ponytail's verified [agent-portability table](https://github.com/DietrichGebert/ponytail/blob/main/docs/agent-portability.md).
 
 ## About Ponytail
 

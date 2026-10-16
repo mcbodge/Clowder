@@ -40,9 +40,20 @@ if (-not $RepoDir) {
 }
 $repo = $RepoDir
 
-function Copy-Instructions {
-    param([string]$Dir)
-    if (Test-Path $Dir) { Copy-Item "$repo\instructions\*.instructions.md" $Dir -Force -ErrorAction Stop }
+# Create the destination (unless -OnlyIfPresent) and copy one or more source globs or files into it.
+function Install-Set {
+    param(
+        [string[]]$Source,
+        [string]$Dest,
+        [switch]$Recurse,
+        [switch]$OnlyIfPresent
+    )
+    if ($OnlyIfPresent) {
+        if (-not (Test-Path $Dest)) { return }
+    } else {
+        New-Item -ItemType Directory -Force $Dest | Out-Null
+    }
+    Copy-Item $Source $Dest -Recurse:$Recurse -Force -ErrorAction Stop
 }
 
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
@@ -69,26 +80,24 @@ if (Test-Path (Join-Path $repo '.git')) {
 if ($ProjectDir) {
     if (-not (Test-Path $ProjectDir)) { Write-Error "ProjectDir '$ProjectDir' not found."; exit 1 }
     $gh = Join-Path $ProjectDir '.github'
-    New-Item -ItemType Directory -Force "$gh\agents", "$gh\instructions", "$gh\skills" | Out-Null
-    Copy-Item "$repo\agents\*.agent.md" "$gh\agents" -Force -ErrorAction Stop
-    Copy-Item "$repo\instructions\*.instructions.md" "$gh\instructions" -Force -ErrorAction Stop
-    Copy-Item "$repo\skills\*" "$gh\skills" -Recurse -Force -ErrorAction Stop
+    Install-Set -Source "$repo\agents\*.agent.md" -Dest "$gh\agents"
+    Install-Set -Source "$repo\instructions\*.instructions.md" -Dest "$gh\instructions"
+    Install-Set -Source "$repo\skills\*" -Dest "$gh\skills" -Recurse
     Write-Host "==> Installed into $gh (agents, instructions, skills)." -ForegroundColor Green
     exit 0
 }
 
 # 3. Copy this repo's pieces into the user profile.
-New-Item -ItemType Directory -Force "$copilot\agents", "$copilot\skills", "$copilot\hooks", "$copilot\instructions" | Out-Null
-Copy-Item "$repo\agents\*.agent.md" "$copilot\agents" -Force -ErrorAction Stop
-Copy-Item "$repo\skills\*" "$copilot\skills" -Recurse -Force -ErrorAction Stop
-Copy-Item "$repo\hooks\git-guard\git-guard.ps1", "$repo\hooks\git-guard\git-guard.sh", "$repo\hooks\env-guard\env-guard.ps1", "$repo\hooks\env-guard\env-guard.sh", "$repo\hooks\planner-write-guard\planner-write-guard.ps1", "$repo\hooks\planner-write-guard\planner-write-guard.sh" "$copilot\hooks" -Force -ErrorAction Stop
+Install-Set -Source "$repo\agents\*.agent.md" -Dest "$copilot\agents"
+Install-Set -Source "$repo\skills\*" -Dest "$copilot\skills" -Recurse
+Install-Set -Source "$repo\hooks\git-guard\git-guard.ps1", "$repo\hooks\git-guard\git-guard.sh", "$repo\hooks\env-guard\env-guard.ps1", "$repo\hooks\env-guard\env-guard.sh", "$repo\hooks\planner-write-guard\planner-write-guard.ps1", "$repo\hooks\planner-write-guard\planner-write-guard.sh" -Dest "$copilot\hooks"
 # Refresh the global git-guard and env-guard hooks only if you opted into them.
-if (Test-Path "$copilot\hooks\git-guard.json") { Copy-Item "$repo\hooks\git-guard\hooks.json" "$copilot\hooks\git-guard.json" -Force }
-if (Test-Path "$copilot\hooks\env-guard.json") { Copy-Item "$repo\hooks\env-guard\hooks.json" "$copilot\hooks\env-guard.json" -Force }
+Install-Set -Source "$repo\hooks\git-guard\hooks.json" -Dest "$copilot\hooks\git-guard.json" -OnlyIfPresent
+Install-Set -Source "$repo\hooks\env-guard\hooks.json" -Dest "$copilot\hooks\env-guard.json" -OnlyIfPresent
 # Instructions: the CLI reads ~/.copilot/instructions; VS Code reads the profile's prompts folder.
-Copy-Instructions "$copilot\instructions"
-Copy-Instructions "$env:APPDATA\Code\User\prompts"
-Copy-Instructions "$env:APPDATA\Code - Insiders\User\prompts"
+Install-Set -Source "$repo\instructions\*.instructions.md" -Dest "$copilot\instructions"
+Install-Set -Source "$repo\instructions\*.instructions.md" -Dest "$env:APPDATA\Code\User\prompts" -OnlyIfPresent
+Install-Set -Source "$repo\instructions\*.instructions.md" -Dest "$env:APPDATA\Code - Insiders\User\prompts" -OnlyIfPresent
 
 # 4. Update external companion tools when their CLIs are present.
 if (Get-Command npm -ErrorAction SilentlyContinue) {
