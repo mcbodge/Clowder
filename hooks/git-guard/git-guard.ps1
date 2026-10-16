@@ -37,11 +37,14 @@ $context = @{
 foreach ($decision in $rules.Keys) {
     foreach ($rule in $rules[$decision].GetEnumerator()) {
         if ($scan -cmatch $rule.Key) {
+            $message = "git-guard: $($rule.Value)"
             @{
-                hookSpecificOutput = @{
+                permissionDecision       = $decision
+                permissionDecisionReason = $message
+                hookSpecificOutput       = @{
                     hookEventName            = 'PreToolUse'
                     permissionDecision       = $decision
-                    permissionDecisionReason = "git-guard: $($rule.Value)"
+                    permissionDecisionReason = $message
                     additionalContext        = $context[$decision]
                 }
             } | ConvertTo-Json -Compress -Depth 3

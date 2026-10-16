@@ -35,7 +35,7 @@ fi
 [ -n "$action" ] || exit 0
 
 decide() { # $1 decision  $2 reason  $3 context
-  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"%s","permissionDecisionReason":"env-guard: %s","additionalContext":"%s"}}\n' "$1" "$2" "$3"
+  printf '{"permissionDecision":"%s","permissionDecisionReason":"env-guard: %s","hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"%s","permissionDecisionReason":"env-guard: %s","additionalContext":"%s"}}\n' "$1" "$2" "$1" "$2" "$3"
   exit 0
 }
 

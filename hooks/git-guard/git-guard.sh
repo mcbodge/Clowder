@@ -17,7 +17,7 @@ decide() {
   else
     context='This can destroy work that may not be yours. Prefer a command limited to the paths or branches you created; otherwise let the user decide.'
   fi
-  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"%s","permissionDecisionReason":"git-guard: %s","additionalContext":"%s"}}\n' "$1" "$2" "$context"
+  printf '{"permissionDecision":"%s","permissionDecisionReason":"git-guard: %s","hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"%s","permissionDecisionReason":"git-guard: %s","additionalContext":"%s"}}\n' "$1" "$2" "$1" "$2" "$context"
   exit 0
 }
 

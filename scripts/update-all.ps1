@@ -81,7 +81,7 @@ if ($ProjectDir) {
 New-Item -ItemType Directory -Force "$copilot\agents", "$copilot\skills", "$copilot\hooks", "$copilot\instructions" | Out-Null
 Copy-Item "$repo\agents\*.agent.md" "$copilot\agents" -Force -ErrorAction Stop
 Copy-Item "$repo\skills\*" "$copilot\skills" -Recurse -Force -ErrorAction Stop
-Copy-Item "$repo\hooks\git-guard\git-guard.ps1", "$repo\hooks\git-guard\git-guard.sh", "$repo\hooks\env-guard\env-guard.ps1", "$repo\hooks\env-guard\env-guard.sh" "$copilot\hooks" -Force -ErrorAction Stop
+Copy-Item "$repo\hooks\git-guard\git-guard.ps1", "$repo\hooks\git-guard\git-guard.sh", "$repo\hooks\env-guard\env-guard.ps1", "$repo\hooks\env-guard\env-guard.sh", "$repo\hooks\planner-write-guard\planner-write-guard.ps1", "$repo\hooks\planner-write-guard\planner-write-guard.sh" "$copilot\hooks" -Force -ErrorAction Stop
 # Refresh the global git-guard and env-guard hooks only if you opted into them.
 if (Test-Path "$copilot\hooks\git-guard.json") { Copy-Item "$repo\hooks\git-guard\hooks.json" "$copilot\hooks\git-guard.json" -Force }
 if (Test-Path "$copilot\hooks\env-guard.json") { Copy-Item "$repo\hooks\env-guard\hooks.json" "$copilot\hooks\env-guard.json" -Force }

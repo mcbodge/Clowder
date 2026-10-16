@@ -46,11 +46,14 @@ if (-not $action) { exit 0 }
 
 function Write-Decision {
     param([string]$Decision, [string]$Reason, [string]$Context)
+    $message = "env-guard: $Reason"
     @{
-        hookSpecificOutput = @{
+        permissionDecision       = $Decision
+        permissionDecisionReason = $message
+        hookSpecificOutput       = @{
             hookEventName            = 'PreToolUse'
             permissionDecision       = $Decision
-            permissionDecisionReason = "env-guard: $Reason"
+            permissionDecisionReason = $message
             additionalContext        = $Context
         }
     } | ConvertTo-Json -Compress -Depth 3
