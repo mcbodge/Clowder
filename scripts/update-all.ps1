@@ -91,10 +91,13 @@ if ($ProjectDir) {
 Install-Set -Source "$repo\agents\*.agent.md" -Dest "$copilot\agents"
 Install-Set -Source "$repo\skills\*" -Dest "$copilot\skills" -Recurse
 Install-Set -Source "$repo\hooks\git-guard\git-guard.ps1", "$repo\hooks\git-guard\git-guard.sh", "$repo\hooks\env-guard\env-guard.ps1", "$repo\hooks\env-guard\env-guard.sh", "$repo\hooks\planner-write-guard\planner-write-guard.ps1", "$repo\hooks\planner-write-guard\planner-write-guard.sh", "$repo\hooks\graphify-sync\graphify-sync.ps1", "$repo\hooks\graphify-sync\graphify-sync.sh" -Dest "$copilot\hooks"
-# Refresh the global git-guard, env-guard, and graphify-sync hooks only if you opted into them.
+# git-guard and env-guard change behavior (deny/ask), so install them globally only if you opted in;
+# the editing agents already declare them in their front matter.
 Install-Set -Source "$repo\hooks\git-guard\hooks.json" -Dest "$copilot\hooks\git-guard.json" -OnlyIfPresent
 Install-Set -Source "$repo\hooks\env-guard\hooks.json" -Dest "$copilot\hooks\env-guard.json" -OnlyIfPresent
-Install-Set -Source "$repo\hooks\graphify-sync\hooks.json" -Dest "$copilot\hooks\graphify-sync.json" -OnlyIfPresent
+# graphify-sync is silent and only acts when graphify is installed, so enable it for every session by
+# default (delete graphify-sync.json to turn it off). It never denies, asks, or changes a decision.
+Copy-Item "$repo\hooks\graphify-sync\hooks.json" "$copilot\hooks\graphify-sync.json" -Force -ErrorAction Stop
 # Instructions: the CLI reads ~/.copilot/instructions; VS Code reads the profile's prompts folder.
 Install-Set -Source "$repo\instructions\*.instructions.md" -Dest "$copilot\instructions"
 Install-Set -Source "$repo\instructions\*.instructions.md" -Dest "$env:APPDATA\Code\User\prompts" -OnlyIfPresent
