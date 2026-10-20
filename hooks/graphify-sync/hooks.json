@@ -1,0 +1,12 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "sh \"$HOME/.copilot/hooks/graphify-sync.sh\"",
+        "windows": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"& ([IO.Path]::Combine([Environment]::GetFolderPath('UserProfile'), '.copilot', 'hooks', 'graphify-sync.ps1'))\"",
+        "timeout": 30
+      }
+    ]
+  }
+}

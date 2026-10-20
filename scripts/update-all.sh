@@ -68,12 +68,13 @@ fi
 # 3. Copy this repo's pieces into the user profile.
 install_set "$COPILOT/agents" "" "$REPO"/agents/*.agent.md
 install_set "$COPILOT/skills" "r" "$REPO"/skills/*
-install_set "$COPILOT/hooks" "" "$REPO"/hooks/git-guard/git-guard.ps1 "$REPO"/hooks/git-guard/git-guard.sh "$REPO"/hooks/env-guard/env-guard.ps1 "$REPO"/hooks/env-guard/env-guard.sh "$REPO"/hooks/planner-write-guard/planner-write-guard.ps1 "$REPO"/hooks/planner-write-guard/planner-write-guard.sh
-chmod +x "$COPILOT/hooks/git-guard.sh" "$COPILOT/hooks/env-guard.sh" "$COPILOT/hooks/planner-write-guard.sh"
+install_set "$COPILOT/hooks" "" "$REPO"/hooks/git-guard/git-guard.ps1 "$REPO"/hooks/git-guard/git-guard.sh "$REPO"/hooks/env-guard/env-guard.ps1 "$REPO"/hooks/env-guard/env-guard.sh "$REPO"/hooks/planner-write-guard/planner-write-guard.ps1 "$REPO"/hooks/planner-write-guard/planner-write-guard.sh "$REPO"/hooks/graphify-sync/graphify-sync.ps1 "$REPO"/hooks/graphify-sync/graphify-sync.sh
+chmod +x "$COPILOT/hooks/git-guard.sh" "$COPILOT/hooks/env-guard.sh" "$COPILOT/hooks/planner-write-guard.sh" "$COPILOT/hooks/graphify-sync.sh"
 install_set "$COPILOT/instructions" "" "$REPO"/instructions/*.instructions.md
-# Refresh the global git-guard and env-guard hooks only if you opted into them.
+# Refresh the global git-guard, env-guard, and graphify-sync hooks only if you opted into them.
 install_set "$COPILOT/hooks/git-guard.json" "p" "$REPO/hooks/git-guard/hooks.json"
 install_set "$COPILOT/hooks/env-guard.json" "p" "$REPO/hooks/env-guard/hooks.json"
+install_set "$COPILOT/hooks/graphify-sync.json" "p" "$REPO/hooks/graphify-sync/hooks.json"
 
 # VS Code / Insiders user prompts (instructions with applyTo).
 case "$(uname -s)" in
