@@ -9,7 +9,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
-Custom agents, instructions, skills, and hooks for AI coding assistants that take a feature request or an Azure DevOps work item from refinement to a tested, reviewed commit. Built for GitHub Copilot in VS Code, Visual Studio, and the CLI, and usable from any agent that reads a repository's `.github/` customizations or `AGENTS.md` — Antigravity, Cursor, Windsurf, Cline, Kiro, and more (see [Other agents & IDEs](#other-agents--ides)). They're tuned for .NET, Blazor, and MudBlazor repositories on Azure DevOps; most pieces work with any stack.
+Custom agents, instructions, skills, and hooks for AI coding assistants that take a feature request or an Azure DevOps work item from refinement to a tested, reviewed commit. Built for GitHub Copilot, with target-specific Antigravity conversion and scoped rules; other IDEs need adaptation (see [Other agents & IDEs](#other-agents--ides)). They're tuned for .NET and Blazor repositories on Azure DevOps; MudBlazor is opt-in and most pieces work with any stack.
 
 - [The 30-second version](#the-30-second-version)
 - [Two design pillars](#two-design-pillars)
@@ -40,7 +40,7 @@ Plan → Execute (test-first) → Review → ship
 - A **Debugger** goes first when a bug's cause is unknown; a **PR Feedback Resolver** turns review comments into commits.
 - Everything else — **C# / C# MCP / MudBlazor Engineers**, **Code Simplifier**, the one-phase **TDD Red / Green / Refactor** — is a specialist you drive by hand.
 
-Guardrails are structural, not vibes: planners are read-only, execution is test-first, agents touch only the **dev** environment, commits stage by explicit path, and **hooks** veto force-pushes, bulk staging, production commands, and any planner write outside `docs/plans/` regardless of what the model decides.
+On supported Copilot hosts with the hook scripts installed, **hooks** veto force-pushes, bulk staging, production commands, and planner writes outside `docs/plans/`. Project installation does not install global hook scripts. Antigravity has native hooks, but Clowder's hook contracts are not ported: role/write boundaries there are prompt restrictions, not deterministic enforcement.
 
 ## Two design pillars
 
@@ -53,7 +53,7 @@ Guardrails are structural, not vibes: planners are read-only, execution is test-
 
 ### 🪶 Token efficiency by design
 
-- **One agent per conversation.** Only the selected agent's prompt loads, so text repeated across agents costs **zero** runtime tokens. Specialists set `disable-model-invocation`, so their descriptions don't ride along on routing either.
+- **One agent per conversation.** Only the selected Copilot agent's prompt loads, so repeated text costs no runtime tokens there. Antigravity conversion emits `mainAgent: true` for direct selection and `subagent: false` only when source `disable-model-invocation` is true; unrestricted workers remain delegable. Host routing/token accounting differs.
 - **Section-reference prompts.** Rules are stated once and referenced by tag (`<hard_rules>` → `<dev_validation>`) instead of restated.
 - **Just-in-time context.** Instructions attach only when an agent edits a matching file; skills load only when a request needs them; hooks never enter the context at all.
 - **Compaction-proof memory.** Long runs persist state to session memory and re-read a one-line summary, not the raw files, after a compaction.
@@ -98,6 +98,8 @@ Select **Install** to add an agent to your VS Code user profile, or copy the fil
 
 The planners (**CAT Planner** and **CAT Planner (DevOps)**) and the **Plan Executor** each come in two flavors: a general one and a `(MudBlazor)` variant that adds the MudBlazor MCP server for Blazor Server + MudBlazor repositories. Install the pair that matches your stack. A `(MudBlazor)` planner names the right executor in each plan's `agent` front matter — the `(MudBlazor)` executor when the plan touches MudBlazor, the plain **Plan Executor** when it doesn't — so the matching one runs it.
 
+**Default/core group:** every agent below except the following **opt-in MudBlazor group**: CAT MudBlazor Engineer, CAT Planner (MudBlazor), CAT Planner (DevOps, MudBlazor), and CAT Plan Executor (MudBlazor). Enable them together with `-MudBlazor` / `--mudblazor`. Generic Auditor and TDD Cycle remain core, discover optional API tools only when needed, and do not require an unavailable Mud executor. Individual Install badges bypass installer selection and MCP setup.
+
 | Agent | Description | Needs |
 | --- | --- | --- |
 | [CAT Planner](agents/cat-planner.agent.md)<br />[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect?url=vscode%3Achat-agent%2Finstall%3Furl%3Dhttps%3A%2F%2Fraw.githubusercontent.com%2Fmcbodge%2Fclowder%2Fmain%2Fagents%2Fcat-planner.agent.md)<br />[![Install in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect?url=vscode-insiders%3Achat-agent%2Finstall%3Furl%3Dhttps%3A%2F%2Fraw.githubusercontent.com%2Fmcbodge%2Fclowder%2Fmain%2Fagents%2Fcat-planner.agent.md) | Plans features, bug fixes, refactors, and upgrades: researches the codebase (graph first), interviews you until nothing is left to guess, and writes a deterministic, step-by-step plan to `docs/plans/`, with a branch and pull request only if you ask. Never edits code. | Plan Executor, planner-write-guard hook; optional: graphify |
@@ -121,6 +123,8 @@ The planners (**CAT Planner** and **CAT Planner (DevOps)**) and the **Plan Execu
 
 ## 📋 Instructions
 
+General Blazor/Razor guidance remains installed even without MudBlazor agents. The shared Blazor instruction also describes optional Mud APIs; Razor file extensions alone do not imply MudBlazor or an available MCP server. Antigravity receives equivalent scoped glob rules rather than always-on inlined guides.
+
 Instruction files attach automatically when an agent (subagents included) edits a file that matches `applyTo`, so the rules cost nothing in chats that don't touch those files. Select **Install** to add one to your VS Code user profile, or copy it to `.github/instructions/` in a repository.
 
 | Instruction | Applies to | Description |
@@ -132,6 +136,8 @@ Instruction files attach automatically when an agent (subagents included) edits 
 
 ## 🎯 Skills
 
+`cat-install` collects the selected harness, scope and optional Mud/version choices, then invokes only the installer scripts; it does not maintain a second copy/merge implementation.
+
 Skills load only when a request needs them. Install with the [GitHub CLI](https://cli.github.com/) 2.90 or later, or copy the folder to `~/.copilot/skills/`.
 
 | Skill | Description | Install |
@@ -140,6 +146,8 @@ Skills load only when a request needs them. Install with the [GitHub CLI](https:
 | [cat-install](skills/cat-install/SKILL.md) | Installs or updates the Clowder — agents, instructions, skills, hooks, and companion tools — into your user profile or a project's `.github/`, by running the `update-all` script. | `gh skills install mcbodge/clowder cat-install` |
 
 ## 🪝 Hooks
+
+The guarantees below apply only on compatible Copilot hosts with the scripts actually installed. Project content still references global hook scripts and does not install them. Antigravity supports native hooks, but Clowder's payload/response adapters are not included; its planning boundary is prompt-only.
 
 Hooks run a script at a point in an agent's lifecycle, either to enforce a rule regardless of what the model decides or to automate setup the agents depend on. They run in VS Code's **Local** agent harness, need the `chat.useHooks` setting (on by default) and a trusted workspace, and are in preview.
 
@@ -159,6 +167,8 @@ Hooks run a script at a point in an agent's lifecycle, either to enforce a rule 
 **graphify-sync** installs **on by default**: `update-all` copies `graphify-sync.ps1` and `graphify-sync.sh` to `~/.copilot/hooks/` and writes `~/.copilot/hooks/graphify-sync.json`, so it runs on every session; delete that `.json` to turn it off. Unlike git-guard and env-guard, it is safe to enable globally because it only reads and maintains a cache — it never denies, asks, or changes an agent's decision. On macOS and Linux, run `chmod +x ~/.copilot/hooks/graphify-sync.sh`. It fires on `SessionStart`, not per tool call, so the graph is warm before an agent needs it, and only does anything when [graphify](https://github.com/Graphify-Labs/graphify) is installed; without it, or when the graph is already current, it exits immediately. The agents never build the graph themselves — they read `graphify-out/graph.json` when it is present and fall back to search when it is not, so this hook replaces the per-run graph bootstrap the planners used to carry in their prompts.
 
 ## Token economics
+
+These accounting details describe Copilot. Antigravity conversion preserves direct selection and source subagent restrictions, but native routing/token accounting differs; scoped rules avoid turning every instruction into permanent context.
 
 The team is built so a context window holds only what the current turn needs. What actually loads:
 
@@ -191,7 +201,68 @@ Weight is the relative size of the prompt that loads when the agent runs (●○
 
 ## Install or update everything
 
-One script installs or updates everything — this repo's agents, instructions, skills, and hooks — then updates the external companions in [Prerequisites and companions](#prerequisites-and-companions) (playwright-cli, the azure-devops-cli skill, and graphify) when their CLIs are present. Run it from anywhere: it reuses the clone it runs from, or clones to `~/.copilot/.cache/clowder` on first run (override with `-RepoDir` / `$env:CLOWDER_DIR`, or `CLOWDER_DIR`). It clones or pulls first, so the same command is both a first-time install and an update. Each tool it can't find is skipped with a note. To install into a repository's `.github/` instead of your user profile, pass `-ProjectDir <repo>` (PowerShell) or `--project <repo>` (bash); each run targets one location only — your user profile or that project's `.github/`, never both. From the chat, the [cat-install](skills/cat-install/SKILL.md) skill runs it for you.
+The two `update-all` entry points install selected content, acquiring/updating the source clone first. Default: **Copilot, global, no MudBlazor**. The [cat-install](skills/cat-install/SKILL.md) skill delegates to them. Reuse the source clone, or bootstrap into `~/.copilot/.cache/clowder`; override via `-RepoDir` / `CLOWDER_DIR` and `-Url` / `CLOWDER_URL`. Global invocations update available companions once, even for `all`; project mode skips companions. Antigravity-only skips unsupported playwright/DevOps companion skill placement (graphify can still be updated).
+
+| PowerShell | Bash | Default / meaning |
+| --- | --- | --- |
+| `-Harness copilot\|antigravity\|all` | `--harness copilot\|antigravity\|all` | `copilot`; `all` selects both at the same scope |
+| `-ProjectDir DIR` | `--project DIR` | Omit for global; directory must exist |
+| `-MudBlazor` | `--mudblazor` | Off; four optional agents and owned `cat-mudblazor-*` skills |
+| `-GlobalMudMcp` | `--global-mud-mcp` | Implies MudBlazor; register globally instead of workspace |
+| `-MudBlazorVersion VERSION` | `--mudblazor-version VERSION` | No default; explicit documentation version for new entries |
+| `-CopilotMcpPath FILE` | `--copilot-mcp-path FILE` | Global Copilot MCP profile/portable override |
+
+Bash accepts `--key=value` and `--key value`; `--help` prints usage. PowerShell supports `Get-Help .\scripts\update-all.ps1`. Invalid/irrelevant options fail before source acquisition or destination writes. Quote whitespace/unicode paths; literal `~/...` and `~\...` paths expand to home.
+
+| Harness / scope | Agents | Instructions/rules | Skills | MCP when requested |
+| --- | --- | --- | --- | --- |
+| Copilot project | `.github/agents/*.agent.md` | `.github/instructions/*.instructions.md` | `.github/skills/` | `.vscode/mcp.json` → `servers` |
+| Copilot global | `~/.copilot/agents/` | `~/.copilot/instructions/`, existing editor `User/prompts/` | `~/.copilot/skills/` | Existing Stable/Insiders `User/mcp.json` → `servers`, or override |
+| Antigravity project | `.agents/agents/*.md` | `.agents/rules/clowder-*.md` | `.agents/skills/` | `.agents/mcp_config.json` → `mcpServers` |
+| Antigravity global | `~/.gemini/config/agents/*.md` | `~/.gemini/config/rules/clowder-*.md`; short managed pointer in `~/.gemini/GEMINI.md` | `~/.gemini/config/skills/` | `~/.gemini/config/mcp_config.json` → `mcpServers` |
+| `all` / either scope | Both corresponding rows | Both corresponding rows | Both corresponding rows | Both when registration selected |
+
+Copilot global profiles: Windows `%APPDATA%\Code\User` and `%APPDATA%\Code - Insiders\User`; macOS `~/Library/Application Support/{Code,Code - Insiders}/User`; Linux `${XDG_CONFIG_HOME:-~/.config}/{Code,Code - Insiders}/User`. Only existing User directories are selected. If neither exists, pass a profile override rather than creating an editor profile. These are VS Code profile destinations, not the separate Copilot-native `~/.copilot/mcp-config.json`.
+
+### Examples and reruns
+
+```powershell
+# Default core Copilot; no Node prerequisite
+.\scripts\update-all.ps1
+# Antigravity with optional content and explicit global registration/version
+.\scripts\update-all.ps1 -Harness antigravity -GlobalMudMcp -MudBlazorVersion 9.11.0
+# Both harnesses in a workspace; no companions or global hook scripts
+.\scripts\update-all.ps1 -Harness all -ProjectDir 'C:\src\app'
+# Workspace MCP with MudBlazor (new entries need the explicit version)
+.\scripts\update-all.ps1 -Harness all -ProjectDir 'C:\src\app' -MudBlazor -MudBlazorVersion 9.11.0
+# Custom global profile; updates only env.MUDBLAZOR_VERSION on existing entries
+.\scripts\update-all.ps1 -GlobalMudMcp -MudBlazorVersion 9.11.0 -CopilotMcpPath '~\portable\User\mcp.json'
+# Bootstrap and forward parameters (trusts remote code)
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/mcbodge/clowder/main/scripts/update-all.ps1))) -Harness all -ProjectDir 'C:\src\app'
+```
+
+```bash
+bash scripts/update-all.sh
+bash scripts/update-all.sh --harness antigravity --global-mud-mcp --mudblazor-version 9.11.0
+bash scripts/update-all.sh --harness=all --project "$HOME/src/app"
+bash scripts/update-all.sh --harness all --project "$HOME/src/app" --mudblazor --mudblazor-version 9.11.0
+bash scripts/update-all.sh --global-mud-mcp --mudblazor-version 9.11.0 --copilot-mcp-path '~/portable/User/mcp.json'
+curl -fsSL https://raw.githubusercontent.com/mcbodge/clowder/main/scripts/update-all.sh | bash -s -- --harness all --project "$HOME/src/app"
+```
+
+Rerun the same flags to update. There is **no stored MudBlazor selection**: omitting it removes only the four owned agents (MudBlazor Engineer, both Mud planners, Mud executor, including known converted names) and repository-owned skill bundles named `cat-mudblazor-*` in selected targets. No such optional skill currently ships. Unrelated files, unselected harnesses, general Blazor instructions and all existing MCP definitions survive. Do not use arbitrary MudBlazor skill names as a cleanup convention.
+
+Project + MudBlazor registers workspace MCP. Global + MudBlazor alone installs content without MCP. `GlobalMudMcp` selects global registration, including an explicit, reported exception to project-only writes; no duplicate workspace registration is added. Existing `mudblazor` entries without a version argument are byte-identical. Supplying a version updates **only** `env.MUDBLAZOR_VERSION`; custom commands/args/env, comments and unrelated settings survive. Conflicting `--version` args or malformed/ambiguous config fail preflight, before content copies. Every requested config is validated before any is written; writes use sibling temporary files and replacement, not a cross-file transaction. A later filesystem failure can leave earlier targets updated and is reported as failure.
+
+### Runtime requirements and limitations
+
+Git and the existing shell prerequisites remain sufficient for plain Copilot copy-only installs. **Node.js 22+** is required for Antigravity conversion or MCP editing. The helper imports only Node built-ins: no package manifest, npm setup, parser downloads or dependency cache. Conversion/merging works offline; cloning/pulling, existing optional companion updates, and MudMCP first launch may use the network.
+
+Canonical new MCP entries require **.NET 10 SDK or later and `dnx` on PATH**, checked without installing/starting a server. Package **MudMCP** uses server ID **`mudblazor`** (prompts reference `mudblazor/*`), command `dnx`, args `MudMCP --yes -- --stdio`. `MUDBLAZOR_VERSION` is mandatory for a new entry; no package detection/default version. The cache env `MudBlazor__Repository__DataPath` is a literal absolute home `.mudmcp` path shared by clients. First launch restores the package and clones/indexes substantial upstream data: review trust/startup prompts, start it in the editor, then verify an actual tool response. Configuration alone does **not** prove connectivity or editor discovery.
+
+Antigravity copies use verified native tool names, `ask_question`, `research` and `invoke_subagent`; unsupported source metadata is discarded, not blindly copied. Optional MCP integrations must be discovered separately. Scoped glob rules preserve instruction scope; user GEMINI content outside the delimited Clowder pointer remains intact. Switch agents manually; Copilot `.prompt.md` metadata is not native Antigravity routing. Planner/Auditor writes are prompt-restricted to resolved `docs/plans/**` paths, including notes in `docs/plans/.clowder-notes/`, with traversal/symlink/terminal bypasses prohibited. Git project installs idempotently exclude notes via the actual `git info/exclude` path (including worktrees/nested projects), never tracked `.gitignore`; non-git projects receive a skip note. Global installs instruct the agents to set the local exclusion in future projects.
+
+All four planners and Auditor finish bounded read-only discovery, then immediately batch independent unknowns in one native interactive call before question recaps or drafts. Dependent follow-ups wait; split only for actual native limits/dependencies. Only genuine absence of any equivalent interactive tool permits <=3 numbered blocking questions; tool errors are not absence. This protocol and Antigravity boundaries are prompt-level, not a claim of runtime enforcement.
 
 **Windows (PowerShell)** — from a clone, or bootstrap from anywhere without one:
 
@@ -209,10 +280,10 @@ bash clowder/scripts/update-all.sh
 curl -fsSL https://raw.githubusercontent.com/mcbodge/clowder/main/scripts/update-all.sh | bash
 ```
 
-The script copies instructions to all three places that read them: VS Code's and Insiders' profile `prompts` folders, and `~/.copilot/instructions/` for the Copilot CLI and Agent Host. Project mode writes to a repository's `.github/` — read by GitHub Copilot in **Visual Studio** and many other agents — but installs only agents, instructions, and skills, since hooks are a VS Code feature with no `.github` home.
+Copilot global installs copy hooks to `~/.copilot/hooks/`, refresh existing git/env global opt-ins and enable graphify-sync. Instructions also go to existing VS Code/Insiders `User/prompts` folders. Project mode installs no global hook scripts: source frontmatter still references them, so install those separately on a compatible host. Antigravity receives no Copilot hooks or editor prompts; its native hooks have a different contract and Clowder enforcement has not been ported.
 
 <details>
-<summary>Prefer to copy by hand? Manual user-profile and project installs</summary>
+<summary>Manual full-copy Copilot installs (includes all MudBlazor content; not Antigravity conversion or MCP setup)</summary>
 
 Clone the repository and copy each folder to its user-level location. Run the same commands again after `git pull` to update; one-click installs are copies too. Copying never deletes: if you installed earlier versions under other file names, remove them, or the agent picker lists both.
 
@@ -276,7 +347,7 @@ The agents call these tools; they aren't included here. Install them from their 
 | --- | --- | --- |
 | [azure-devops-cli](https://github.com/github/awesome-copilot/tree/main/skills/azure-devops-cli) skill | CAT Planner (DevOps), Plan Executor (work-item plans and pull requests), PR Feedback Resolver, Debugger, cat-release-notes | `gh skills install github/awesome-copilot azure-devops-cli`, plus the [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) with `az extension add --name azure-devops` and `az login` |
 | [playwright-cli](https://github.com/microsoft/playwright-cli) | Plan Executor, Debugger, PR Feedback Resolver, MudBlazor Engineer, C# Engineer, and TDD Cycle, TDD Red, and TDD Green for UI bugs | `npm install -g @playwright/cli@latest`, then `playwright-cli install --skills`. The Plan Executor, Debugger, and PR Feedback Resolver keep its `.playwright-cli/` snapshots and their own `logs/` out of `git status` through `.git/info/exclude`, never `.gitignore` |
-| [MudBlazor MCP server](https://github.com/mcbodge/MudMCP) | MudBlazor Engineer, TDD Cycle, the `(MudBlazor)` planner and executor variants, `blazor` instructions | Follow its Quick Start and name the server `mudblazor` in `.vscode/mcp.json`; the agents only look for `mudblazor/*` tools |
+| [MudBlazor MCP server](https://github.com/mcbodge/MudMCP) (opt-in) | MudBlazor agents; generic Auditor/TDD Cycle discover optional APIs for actual Mud work | Use the installer MCP flags and explicit documentation version above, or configure manually; ID `mudblazor`, package MudMCP, .NET 10 SDK/dnx. Verify a real tool response after trust/startup. |
 | [graphify](https://github.com/Graphify-Labs/graphify) (optional) | The planners, the Plan Executor variants, Auditor, Debugger | `uv tool install graphifyy` (or `pipx install graphifyy`). The [graphify-sync](hooks/graphify-sync/) hook keeps the graph built, filtered to meaningful source, and out of `git status` automatically; the agents only read `graphify-out/graph.json` and fall back to search when it is absent. Without the hook you can build it once per repository yourself with `graphify extract . --code-only` and refresh with `graphify update .` |
 | Aspire dashboard MCP server (optional) | Debugger | Register the dashboard's MCP endpoint as `aspire-dashboard` in `.vscode/mcp.json` |
 | [Trojan Skill Hunter](https://github.com/github/awesome-copilot/blob/main/agents/trojan-skill-hunter.agent.md) (optional) | You, before trusting any third-party agent, skill, or hook | Install it from awesome-copilot and run it once per new plugin |
@@ -287,20 +358,21 @@ Visual Studio reads the same file formats with fewer features, and has no instal
 
 | Piece | Where it goes | Notes |
 | --- | --- | --- |
-| Agents (18.4 or later) | `%USERPROFILE%\.github\agents\` for every solution (change it in **Tools > Options > GitHub > Copilot**), or `.github/agents/` in a repository | Visual Studio documents only `name`, `description`, `model`, and `tools`, and its tool names differ (`code_search`, `readfile`, `editfiles`, `runcommandinterminal`, ...). Delete each agent's `tools` line to enable every tool, or replace it with names from the chat **Tools** panel. Handoff buttons, subagents, and hooks are VS Code features, so run the Plan Executor and PR Feedback Resolver from VS Code. |
+| Agents (18.4 or later) | `%USERPROFILE%\.github\agents\` for every solution (change it in **Tools > Options > GitHub > Copilot**), or `.github/agents/` in a repository | Visual Studio's tool names differ (`code_search`, `readfile`, `editfiles`, `runcommandinterminal`, ...). Review restrictions and map tools explicitly from its Tools panel; deleting tool restrictions broadens authority. This installer does not translate Visual Studio tools or install its user agent path. Verify current host handoff/subagent/hook support rather than assuming VS Code contracts work. |
 | Instructions | `.github/instructions/` in the repository | `applyTo` works once **Enable custom instructions to be loaded from .github/copilot-instructions.md files and added to requests** is on (**Tools > Options > GitHub > Copilot > Copilot Chat**). The only user-level file is `%USERPROFILE%\copilot-instructions.md`, which has no `applyTo` and applies to every request. |
 | Skills (18.5 or later) | `%USERPROFILE%\.copilot\skills\` or `.github/skills/` | Work as-is. |
-| Hooks | - | Not supported; the agents' written commit rules still apply. |
+| Hooks | - | Clowder hook enforcement is not installed for Visual Studio; verify current host support separately. Written rules are not deterministic enforcement. |
 | MCP servers | `%USERPROFILE%\.mcp.json`, or the solution's `.mcp.json` or `.vscode\mcp.json` | A repository's `.vscode/mcp.json` works in both editors, so one `mudblazor` entry there serves both. |
 
 ## Other agents & IDEs
 
-Beyond GitHub Copilot (VS Code, Visual Studio, the CLI), these files work with other agents to varying degrees. The honest picture: **skills** (`SKILL.md`) and the repo-wide **instructions** port widely; the **agents** (`.agent.md`) are a Copilot / Visual Studio format that other tools don't read natively; and most non-Copilot tools take a single always-on rules file (`AGENTS.md`) or their own rules folder rather than this repo's per-file `applyTo` instructions, so instruction content copies but its front matter needs a small tweak to each tool's format.
+Beyond GitHub Copilot, portability varies. Antigravity is explicitly converted by the installer (agents, native tools and scoped glob rules), not a blind `.github` copy. Other hosts need manual adaptation; availability of native hooks or subagents does not mean Clowder's contracts are compatible.
 
 | Agent / IDE | Where it reads customizations | What drops in |
 | --- | --- | --- |
-| GitHub Copilot (VS Code, Visual Studio, CLI) | `.github/agents`, `.github/instructions`, `.github/skills`, `~/.copilot/`, the VS Code profile `prompts` folder | Everything, as-is |
-| Any agent that reads `AGENTS.md` (Antigravity, Zed, Amp, Jules, Codex, Aider, Junie, Goose) | `AGENTS.md` at the repo root (Antigravity also `.agents/rules/`) | Instruction content as one always-on file; skills via the tool's skills folder |
+| GitHub Copilot | `.github/agents`, `.github/instructions`, `.github/skills`, `~/.copilot/`, editor profile prompts | Host tool/hook differences still apply; see Visual Studio caveats |
+| Antigravity | `.agents/{agents,rules,skills}`, global `~/.gemini/config/{agents,rules,skills}` | Use `--harness antigravity`; Clowder hooks are not ported; global MCP runtime discovery still needs a real editor smoke test |
+| Other agents reading `AGENTS.md` (Zed, Amp, Jules, Codex, Aider, Junie, Goose) | `AGENTS.md` at the repo root | Manually adapted instruction content; skills via the tool's skills folder |
 | Cursor | `.cursor/rules/*.mdc` (and `AGENTS.md`) | Instruction content as `.mdc` rules (convert `applyTo` to `globs`) |
 | Windsurf | `.windsurf/rules/*.md` | Instruction content as rules |
 | Cline | `.clinerules/*.md` or `~/.cline/rules/` (and `AGENTS.md`); skills in `.agents/skills/` | Instruction content as rules; skills as-is |

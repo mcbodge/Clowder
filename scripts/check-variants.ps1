@@ -57,6 +57,25 @@ function Get-Sections {
 }
 
 $drift = @()
+$gateReference = $null
+foreach ($name in @('cat-planner', 'cat-planner-mudblazor', 'cat-planner-devops', 'cat-planner-devops-mudblazor', 'cat-auditor')) {
+    $file = Join-Path $agentsDir ($name + '.agent.md')
+    $text = (Get-Content -LiteralPath $file -Raw) -replace "`r", ''
+    $gate = [regex]::Match($text, '(?ms)^<clarification_gate>\n(.*?)^</clarification_gate>').Groups[1].Value
+    if (-not $gateReference) { $gateReference = $gate }
+    $clauses = @('bounded read-only discovery pass first', 'immediately invoke', 'one call batching independent',
+        'before any long recap, plan draft or final response', 'actual native tool limit or answer-dependent',
+        'no equivalent native interactive tool genuinely exists', '<=3 blocking questions',
+        'Tool failure, deferred discovery, inconvenience or a missing response is not unavailability')
+    if (-not $gate -or $gate -ne $gateReference) { throw "Missing or divergent clarification gate: $name" }
+    foreach ($clause in $clauses) { if (-not $gate.Contains($clause)) { throw "Missing protocol clause '$clause': $name" } }
+    $front = ($text -split '---', 3)[1]
+    if ($front -notmatch '(?m)^tools:.*vscode/askQuestions') { throw "Missing native clarification tool: $name" }
+    if ($text -match 'batch at most 3|Intent-only questions .*go straight to the user|Ask questions only via') {
+        throw "Contradictory legacy clarification rule: $name"
+    }
+}
+Write-Host '  Five planning agents share the discovery-complete clarification protocol (static check only).'
 foreach ($pair in $Pairs) {
     $basePath = Join-Path $agentsDir $pair.Base
     $varPath  = Join-Path $agentsDir $pair.Variant

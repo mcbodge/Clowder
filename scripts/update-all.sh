@@ -6,29 +6,93 @@
 # azure-devops-cli skill, and graphify when their CLIs are installed. Run it from anywhere,
 # even outside a clone: it reuses the clone it runs from, or clones to
 # $HOME/.copilot/.cache/clowder. Override with CLOWDER_DIR / _URL.
-# Pass --project <repo> to install into that repository's .github folder instead of your user
-# profile (one method per run; ~/.copilot, editor prompts, and companion tools are left alone).
+# --harness selects copilot (default), antigravity, or all; --mudblazor opts into extra content.
+# --project selects workspace content; --global-mud-mcp is an explicit global config exception.
 set -euo pipefail
 
 COPILOT="$HOME/.copilot"
 URL="${CLOWDER_URL:-https://github.com/mcbodge/clowder.git}"
 REPO="${CLOWDER_DIR:-}"
 PROJECT=""
+HARNESS=copilot
+MUDBLAZOR=false
+GLOBAL_MUD_MCP=false
+MUD_VERSION=""
+MCP_PATH=""
+VERSION_PRESENT=false
 while [ $# -gt 0 ]; do
   case "$1" in
-    --project=*) PROJECT="${1#*=}" ;;
-    --project) shift; PROJECT="${1:-}" ;;
+    --harness=*|--mudblazor-version=*|--copilot-mcp-path=*)
+      key="${1%%=*}"; value="${1#*=}"
+      [ -n "$value" ] || { echo "Missing value for $key" >&2; exit 1; }
+      case "$key" in --harness) HARNESS="$value";; --mudblazor-version) MUD_VERSION="$value"; VERSION_PRESENT=true;; --copilot-mcp-path) MCP_PATH="$value";; esac ;;
+    --harness|--mudblazor-version|--copilot-mcp-path)
+      key="$1"; shift
+      [ $# -gt 0 ] && [ -n "$1" ] && [[ "$1" != --* ]] || { echo "Missing value for $key" >&2; exit 1; }
+      case "$key" in --harness) HARNESS="$1";; --mudblazor-version) MUD_VERSION="$1"; VERSION_PRESENT=true;; --copilot-mcp-path) MCP_PATH="$1";; esac ;;
+    --mudblazor) MUDBLAZOR=true ;;
+    --global-mud-mcp) GLOBAL_MUD_MCP=true; MUDBLAZOR=true ;;
+    --help|-h) echo "Usage: update-all.sh [--project DIR] [--harness copilot|antigravity|all] [--mudblazor] [--global-mud-mcp] [--mudblazor-version VERSION] [--copilot-mcp-path FILE]"; exit 0 ;;
+    --project=*) PROJECT="${1#*=}"; [ -n "$PROJECT" ] || { echo "Missing --project value" >&2; exit 1; } ;;
+    --project) shift; [ $# -gt 0 ] && [ -n "$1" ] && [[ "$1" != --* ]] || { echo "Missing --project value" >&2; exit 1; }; PROJECT="$1" ;;
+    *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
   shift || true
 done
+case "$HARNESS" in copilot|antigravity|all) ;; *) echo "Invalid --harness: $HARNESS" >&2; exit 1;; esac
+expand_home() { case "$1" in '~') printf '%s\n' "$HOME";; '~/'*|'~\'*) printf '%s/%s\n' "$HOME" "${1:2}";; *) printf '%s\n' "$1";; esac; }
+[ -z "$PROJECT" ] || PROJECT="$(expand_home "$PROJECT")"
+[ -z "$REPO" ] || REPO="$(expand_home "$REPO")"
+if [ -n "$PROJECT" ] && [ ! -d "$PROJECT" ]; then echo "--project must name a directory." >&2; exit 1; fi
+if [ -n "$MCP_PATH" ] && { [ "$GLOBAL_MUD_MCP" != true ] || [ "$HARNESS" = antigravity ]; }; then echo "--copilot-mcp-path requires --global-mud-mcp and a Copilot target." >&2; exit 1; fi
+if [ "$VERSION_PRESENT" = true ]; then
+  if [ "$MUDBLAZOR" != true ] || { [ -z "$PROJECT" ] && [ "$GLOBAL_MUD_MCP" != true ]; }; then echo "--mudblazor-version requires project MCP registration or --global-mud-mcp." >&2; exit 1; fi
+  [[ "$MUD_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]] || { echo "Pass a valid --mudblazor-version (for example 8.15.0)." >&2; exit 1; }
+fi
+NEEDS_HELPER=false
+if [ "$HARNESS" != copilot ] || { [ "$MUDBLAZOR" = true ] && { [ -n "$PROJECT" ] || [ "$GLOBAL_MUD_MCP" = true ]; }; }; then
+  NEEDS_HELPER=true
+  command -v node >/dev/null 2>&1 || { echo "Node.js 22+ is required for Antigravity/MCP (no npm dependencies)." >&2; exit 1; }
+  [ "$(node -p 'process.versions.node.split(`.`)[0]')" -ge 22 ] || { echo "Node.js 22+ is required." >&2; exit 1; }
+fi
+
+assert_safe_destination() {
+  local current="${1//\\//}" parent
+  while [ "$current" != "." ] && [ "$current" != "/" ] && [ -n "$current" ]; do
+    [ ! -L "$current" ] || { echo "Refusing linked destination: $current" >&2; exit 1; }
+    parent="${current%/*}"
+    [ "$parent" != "$current" ] || break
+    current="$parent"
+  done
+}
 
 # Create the destination (unless the p flag) and copy sources into it.
 # Usage: install_set <dest> <flags: r=recurse, p=only-if-present> <source>...
 install_set() {
   local dest="$1" flags="$2"; shift 2
+  assert_safe_destination "$dest"
+  [[ "$flags" == *p* ]] || [ ! -e "$dest" ] || [ -d "$dest" ] || { echo "Expected directory: $dest" >&2; exit 1; }
   if [[ "$flags" == *p* ]] && [ ! -e "$dest" ]; then return 0; fi
   if [[ "$flags" != *p* ]]; then mkdir -p "$dest"; fi
-  if [[ "$flags" == *r* ]]; then cp -R "$@" "$dest"; else cp "$@" "$dest"; fi
+  local source name optional
+  for source in "$@"; do
+    name="${source##*/}"
+    assert_safe_destination "$dest/$name"
+    optional=false
+    case "$name" in
+      cat-mudblazor-engineer.agent.md|cat-planner-mudblazor.agent.md|cat-planner-devops-mudblazor.agent.md|cat-plan-executor-mudblazor.agent.md) optional=true ;;
+      cat-mudblazor-*) if [ -d "$source" ]; then optional=true; fi ;;
+    esac
+    if [ "$optional" = true ] && [ "$MUDBLAZOR" = false ]; then
+          [ ! -L "$dest" ] && [ ! -L "$dest/$name" ] || { echo "Refusing linked optional target" >&2; exit 1; }
+          [ -d "$source" ] || [ ! -d "$dest/$name" ] || { echo "Expected optional agent file: $dest/$name" >&2; exit 1; }
+          rm -rf -- "$dest/$name"
+          case "$name" in *.agent.md) assert_safe_destination "$dest/${name%.agent.md}.md"; rm -f -- "$dest/${name%.agent.md}.md";; esac
+          echo "Omitted owned optional content: $name"
+          continue
+    fi
+    if [[ "$flags" == *r* ]]; then cp -R "$source" "$dest"; else cp "$source" "$dest"; fi
+  done
 }
 
 # 1. Locate the repo: explicit override, the clone this script runs from, or the cache clone.
@@ -43,7 +107,7 @@ fi
 command -v git >/dev/null 2>&1 || { echo "git is required but was not found on PATH." >&2; exit 1; }
 
 # 2. Clone on first run, otherwise pull the latest.
-if [ -d "$REPO/.git" ]; then
+if [ -e "$REPO/.git" ]; then
   echo "==> Updating clowder in $REPO"
   git -C "$REPO" pull --ff-only || echo "git pull failed; continuing with the copy." >&2
 elif [ -d "$REPO" ] && [ -n "$(ls -A "$REPO" 2>/dev/null)" ]; then
@@ -54,18 +118,28 @@ else
   git clone "$URL" "$REPO"
 fi
 
+if [ "$NEEDS_HELPER" = true ]; then
+  helper_args=(repo "$REPO" harness "$HARNESS" mud "$MUDBLAZOR" globalMcp "$GLOBAL_MUD_MCP")
+  [ -z "$PROJECT" ] || helper_args+=(project "$PROJECT")
+  [ "$VERSION_PRESENT" != true ] || helper_args+=(version "$MUD_VERSION")
+  [ -z "$MCP_PATH" ] || helper_args+=(mcpPath "$MCP_PATH")
+  node "$REPO/scripts/install-support.mjs" "${helper_args[@]}"
+fi
+
 # Project mode: install into a repository's .github folder only, then stop (one method per run).
 if [ -n "$PROJECT" ]; then
-  [ -d "$PROJECT" ] || { echo "--project '$PROJECT' not found." >&2; exit 1; }
-  GH="$PROJECT/.github"
-  install_set "$GH/agents" "" "$REPO"/agents/*.agent.md
-  install_set "$GH/instructions" "" "$REPO"/instructions/*.instructions.md
-  install_set "$GH/skills" "r" "$REPO"/skills/*
-  echo "==> Installed into $GH (agents, instructions, skills)."
+  if [ "$HARNESS" != antigravity ]; then
+    GH="$PROJECT/.github"
+    install_set "$GH/agents" "" "$REPO"/agents/*.agent.md
+    install_set "$GH/instructions" "" "$REPO"/instructions/*.instructions.md
+    install_set "$GH/skills" "r" "$REPO"/skills/*
+  fi
+  echo "==> Installed $HARNESS project content. Copilot project hooks require global hook scripts; Antigravity hook enforcement is not ported."
   exit 0
 fi
 
 # 3. Copy this repo's pieces into the user profile.
+if [ "$HARNESS" != antigravity ]; then
 install_set "$COPILOT/agents" "" "$REPO"/agents/*.agent.md
 install_set "$COPILOT/skills" "r" "$REPO"/skills/*
 install_set "$COPILOT/hooks" "" "$REPO"/hooks/git-guard/git-guard.ps1 "$REPO"/hooks/git-guard/git-guard.sh "$REPO"/hooks/env-guard/env-guard.ps1 "$REPO"/hooks/env-guard/env-guard.sh "$REPO"/hooks/planner-write-guard/planner-write-guard.ps1 "$REPO"/hooks/planner-write-guard/planner-write-guard.sh "$REPO"/hooks/graphify-sync/graphify-sync.ps1 "$REPO"/hooks/graphify-sync/graphify-sync.sh
@@ -82,13 +156,16 @@ cp "$REPO/hooks/graphify-sync/hooks.json" "$COPILOT/hooks/graphify-sync.json"
 # VS Code / Insiders user prompts (instructions with applyTo).
 case "$(uname -s)" in
   Darwin) BASE="$HOME/Library/Application Support" ;;
-  *)      BASE="$HOME/.config" ;;
+  MINGW*|MSYS*) BASE="${APPDATA:-$HOME/.config}" ;;
+  *)      BASE="${XDG_CONFIG_HOME:-$HOME/.config}" ;;
 esac
 for dir in "$BASE/Code/User/prompts" "$BASE/Code - Insiders/User/prompts"; do
   install_set "$dir" "p" "$REPO"/instructions/*.instructions.md
 done
+fi
 
 # 4. Update external companion tools when their CLIs are present (best effort).
+if [ "$HARNESS" != antigravity ]; then
 if command -v npm >/dev/null 2>&1; then
   npm install -g @playwright/cli@latest || echo "playwright-cli update failed." >&2
   if command -v playwright-cli >/dev/null 2>&1; then
@@ -101,6 +178,9 @@ if command -v gh >/dev/null 2>&1; then
   gh skills install github/awesome-copilot azure-devops-cli || echo "azure-devops-cli update failed." >&2
 else
   echo "GitHub CLI (gh) not found; skipping the azure-devops-cli skill." >&2
+fi
+else
+  echo "Skipping playwright/azure-devops companion skill placement: Antigravity integration is not supported by this installer." >&2
 fi
 if command -v uv >/dev/null 2>&1; then
   uv tool upgrade graphifyy 2>/dev/null || uv tool install graphifyy || echo "graphify update failed." >&2
