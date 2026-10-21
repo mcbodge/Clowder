@@ -7,7 +7,7 @@
 # even outside a clone: it reuses the clone it runs from, or clones to
 # $HOME/.copilot/.cache/clowder. Override with CLOWDER_DIR / _URL.
 # --harness selects copilot (default), antigravity, or all; --mudblazor opts into extra content.
-# --project selects workspace content; npm global CLI updates and --global-mud-mcp are exceptions.
+# --project selects workspace content; GitHub CLI/npm updates and --global-mud-mcp are exceptions.
 set -euo pipefail
 
 COPILOT="$HOME/.copilot"
@@ -127,8 +127,54 @@ if [ "$NEEDS_HELPER" = true ]; then
   node "$REPO/scripts/install-support.mjs" "${helper_args[@]}"
 fi
 
+update_github_cli() {
+  command -v gh >/dev/null 2>&1 || return 0
+  local manager="" gh_path
+  gh_path="$(command -v gh)"
+  case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*)
+      if command -v winget >/dev/null 2>&1; then
+        winget upgrade --id GitHub.cli --exact --silent --disable-interactivity --accept-source-agreements --accept-package-agreements && return 0
+        echo "WARNING: GitHub CLI upgrade failed; run winget upgrade --id GitHub.cli --exact manually with appropriate permissions." >&2
+        return 0
+      fi ;;
+    Darwin)
+      if command -v brew >/dev/null 2>&1; then
+        brew upgrade gh && return 0
+        echo "WARNING: GitHub CLI upgrade failed; run brew upgrade gh manually." >&2
+        return 0
+      fi ;;
+    Linux)
+      gh_path="$(readlink -f "$gh_path")"
+      if command -v dpkg-query >/dev/null 2>&1 && dpkg-query -S "$gh_path" 2>/dev/null | grep -q '^gh: ' && command -v apt-get >/dev/null 2>&1; then
+        manager=apt-get
+      elif command -v rpm >/dev/null 2>&1 && [ "$(rpm -qf --qf '%{NAME}' "$gh_path" 2>/dev/null)" = gh ]; then
+        for manager in dnf yum zypper; do command -v "$manager" >/dev/null 2>&1 && break; manager=""; done
+      elif command -v pacman >/dev/null 2>&1 && [ "$(pacman -Qoq "$gh_path" 2>/dev/null)" = github-cli ]; then
+        manager=pacman
+      fi
+      if [ -n "$manager" ]; then
+        if [ "$(id -u)" != 0 ]; then
+          echo "WARNING: GitHub CLI upgrade needs permissions; upgrade gh with $manager manually (no sudo is invoked)." >&2
+          return 0
+        fi
+        case "$manager" in
+          apt-get) apt-get install --only-upgrade -y gh </dev/null && return 0 ;;
+          dnf|yum) "$manager" upgrade -y gh </dev/null && return 0 ;;
+          zypper) zypper --non-interactive update gh </dev/null && return 0 ;;
+          pacman) pacman -S --needed --noconfirm github-cli </dev/null && return 0 ;;
+        esac
+        echo "WARNING: GitHub CLI upgrade failed; upgrade gh with $manager manually, then rerun." >&2
+        return 0
+      fi ;;
+  esac
+  echo "WARNING: No supported package manager owns GitHub CLI; upgrade gh using its original installer from https://cli.github.com/ and rerun." >&2
+}
+
 install_companions() (
-  [ -z "$PROJECT" ] || echo "WARNING: Project scope exception: npm install -g updates the global Playwright CLI; companion skills stay in the selected project." >&2
+  [ -z "$PROJECT" ] || echo "WARNING: Project scope exception: GitHub CLI and npm global CLI updates affect installed tools; companion skills stay in the selected project." >&2
+  update_github_cli
+  hash -r
   stage="$(cd "$REPO" && pwd)/.clowder-companions-$$-$RANDOM"
   mkdir "$stage" || { echo "WARNING: Cannot stage companions; continuing Clowder installation." >&2; return; }
   trap 'rm -rf -- "$stage"' EXIT
@@ -146,13 +192,13 @@ install_companions() (
   else
     echo "WARNING: playwright-cli not found; install npm and run npm install -g @playwright/cli@latest." >&2
   fi
-  if command -v gh >/dev/null 2>&1; then
+  if command -v gh >/dev/null 2>&1 && gh skill --help >/dev/null 2>&1; then
     if ! gh skill install github/awesome-copilot azure-devops-cli --dir "$stage/.agents/skills" --force; then
       echo "WARNING: azure-devops-cli installation failed. Install/upgrade GitHub CLI from https://cli.github.com/ with gh skill support (gh skills may be unavailable); see https://cli.github.com/manual/gh_skill_install. Continuing Clowder installation." >&2
       rm -rf -- "$stage/.agents/skills/azure-devops-cli"
     fi
   else
-    echo "WARNING: GitHub CLI (gh) not found; install/upgrade from https://cli.github.com/ with gh skill support for azure-devops-cli." >&2
+    echo "WARNING: GitHub CLI (gh) not found or gh skill unsupported. Install/upgrade GitHub CLI from https://cli.github.com/ with gh skill support; reopen the terminal to refresh PATH, then rerun for azure-devops-cli." >&2
   fi
   targets=()
   if [ "$HARNESS" != antigravity ]; then targets+=("${PROJECT:-$HOME}/$([ -n "$PROJECT" ] && echo .github || echo .copilot)/skills"); fi

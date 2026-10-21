@@ -13,7 +13,7 @@
   Git URL to clone from when RepoDir has no clone yet. Also set by $env:CLOWDER_URL.
 .PARAMETER ProjectDir
   Install selected harness content and companion skills into an existing project; skip global hooks.
-  The automatic npm global CLI update is an explicit exception to project-only writes.
+  GitHub CLI upgrades and the npm global CLI update are exceptions to project-only writes.
   GlobalMudMcp explicitly permits global MCP configuration even in project mode.
 .PARAMETER Harness
   copilot (default), antigravity, or all, at the same selected scope.
@@ -167,8 +167,47 @@ if ($needsHelper) {
     if ($LASTEXITCODE -ne 0) { throw "Installation helper failed; no Copilot copy attempted." }
 }
 
+function Update-GitHubCli {
+    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { return }
+    try {
+        $manager = ''
+        if ($env:OS -eq 'Windows_NT') {
+            if (Get-Command winget -ErrorAction SilentlyContinue) {
+                $manager = 'winget'
+                & winget upgrade --id GitHub.cli --exact --silent --disable-interactivity --accept-source-agreements --accept-package-agreements
+            }
+        } elseif ((& uname -s) -eq 'Darwin') {
+            if (Get-Command brew -ErrorAction SilentlyContinue) { $manager = 'brew'; & brew upgrade gh }
+        } else {
+            $ghPath = & readlink -f (Get-Command gh).Source
+            if ((Get-Command dpkg-query -ErrorAction SilentlyContinue) -and ((& dpkg-query -S $ghPath 2>$null) -match '^gh: ') -and (Get-Command apt-get -ErrorAction SilentlyContinue)) {
+                $manager = 'apt-get'
+            } elseif ((Get-Command rpm -ErrorAction SilentlyContinue) -and ((& rpm -qf --qf '%{NAME}' $ghPath 2>$null) -eq 'gh')) {
+                foreach ($candidate in @('dnf', 'yum', 'zypper')) {
+                    if (Get-Command $candidate -ErrorAction SilentlyContinue) { $manager = $candidate; break }
+                }
+            } elseif ((Get-Command pacman -ErrorAction SilentlyContinue) -and ((& pacman -Qoq $ghPath 2>$null) -eq 'github-cli')) { $manager = 'pacman' }
+            if ($manager) {
+                if ((& id -u) -ne '0') {
+                    Write-Warning "GitHub CLI upgrade needs permissions; upgrade gh with $manager manually (no sudo is invoked)."
+                    return
+                }
+                switch ($manager) {
+                    'apt-get' { '' | & apt-get install --only-upgrade -y gh }
+                    { $_ -in 'dnf', 'yum' } { '' | & $manager upgrade -y gh }
+                    'zypper' { '' | & zypper --non-interactive update gh }
+                    'pacman' { '' | & pacman -S --needed --noconfirm github-cli }
+                }
+            }
+        }
+        if (-not $manager) { Write-Warning 'No supported package manager owns GitHub CLI; upgrade gh using its original installer from https://cli.github.com/ and rerun.' }
+        elseif ($LASTEXITCODE -ne 0) { Write-Warning "GitHub CLI upgrade failed; upgrade gh with $manager manually with appropriate permissions, then rerun." }
+    } catch { Write-Warning "GitHub CLI upgrade failed: $_; upgrade gh manually from https://cli.github.com/ and rerun." }
+}
+
 function Install-Companions {
-    if ($ProjectDir) { Write-Warning 'Project scope exception: npm install -g updates the global Playwright CLI; companion skills stay in the selected project.' }
+    if ($ProjectDir) { Write-Warning 'Project scope exception: GitHub CLI and npm global CLI updates affect installed tools; companion skills stay in the selected project.' }
+    Update-GitHubCli
     $stage = Join-Path $repo ('.clowder-companions-' + [guid]::NewGuid().ToString('N'))
     try {
         New-Item -ItemType Directory $stage | Out-Null
@@ -185,11 +224,21 @@ function Install-Companions {
                     Remove-Item -LiteralPath (Join-Path $stage '.agents\skills\playwright-cli') -Recurse -Force -ErrorAction SilentlyContinue
                 }
             } else { Write-Warning 'playwright-cli not found; install npm and run npm install -g @playwright/cli@latest.' }
-            if (Get-Command gh -ErrorAction SilentlyContinue) {
-                & gh skill install github/awesome-copilot azure-devops-cli --dir (Join-Path $stage '.agents\skills') --force
+            $ghCommand = Get-Command gh -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($ghCommand) {
+                $skillSupported = $false
+                try {
+                    & $ghCommand.Source skill --help *> $null
+                    $skillSupported = $LASTEXITCODE -eq 0
+                } catch { }
+                if (-not $skillSupported) {
+                    Write-Warning 'Install/upgrade GitHub CLI with gh skill support from https://cli.github.com/; reopen the terminal to refresh PATH, then rerun. azure-devops-cli was NOT installed/updated.'
+                } else {
+                & $ghCommand.Source skill install github/awesome-copilot azure-devops-cli --dir (Join-Path $stage '.agents\skills') --force
                 if ($LASTEXITCODE -ne 0) {
                     Write-Warning 'azure-devops-cli installation failed. Install/upgrade GitHub CLI from https://cli.github.com/ with gh skill support (gh skills may be unavailable); see https://cli.github.com/manual/gh_skill_install. Continuing Clowder installation.'
                     Remove-Item -LiteralPath (Join-Path $stage '.agents\skills\azure-devops-cli') -Recurse -Force -ErrorAction SilentlyContinue
+                }
                 }
             } else { Write-Warning 'GitHub CLI (gh) not found; install/upgrade from https://cli.github.com/ with gh skill support for azure-devops-cli.' }
         } finally { Pop-Location }

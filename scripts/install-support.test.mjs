@@ -242,7 +242,7 @@ const psAvailable = spawnSync(powershell, ['-NoProfile', '-Command', 'exit 0']).
 const bashPath = value => process.platform === 'win32' ? value.replace(/^([A-Za-z]):/, (_, drive) => '/' + drive.toLowerCase()).replaceAll('\\', '/') : value;
 function wrapperFixture() {
   const f = fixture(); const bin = path.join(f.root, 'bin'); fs.mkdirSync(bin);
-  for (const name of ['git', 'npm', 'gh', 'uv', 'playwright-cli']) {
+  for (const name of ['git', 'npm', 'gh', 'uv', 'playwright-cli', 'winget', 'brew', 'apt-get', 'dnf', 'yum', 'zypper', 'pacman', 'dpkg-query', 'rpm']) {
     write(path.join(bin, name), `#!/bin/sh\nprintf '%s\\n' '${name}' >> "$CLOWDER_FIXTURE_LOG"\n${name === 'git' ? '[ "$3" != rev-parse ] || exit 1\n' : ''}exit 0\n`);
     fs.chmodSync(path.join(bin, name), 0o755);
     write(path.join(bin, name + '.cmd'), `@echo ${name}>>"%CLOWDER_FIXTURE_LOG%"\r\n${name === 'git' ? '@if "%~3"=="rev-parse" exit /b 1\r\n' : ''}@exit /b 0\r\n`);
@@ -254,6 +254,11 @@ const [name, ...args] = process.argv.slice(2);
 fs.appendFileSync(process.env.CLOWDER_FIXTURE_LOG, name + '\\n');
 fs.appendFileSync(process.env.CLOWDER_FIXTURE_LOG + '.jsonl', JSON.stringify({ name, args, cwd: process.cwd() }) + '\\n');
 if (process.env.CLOWDER_FAIL === name) { console.error('fixture failure: ' + name); process.exit(1); }
+if (['winget', 'brew', 'apt-get', 'dnf', 'yum', 'zypper', 'pacman'].includes(name) && !args.includes('-Qoq')) fs.writeFileSync(process.env.CLOWDER_FIXTURE_LOG + '.upgraded', '');
+if (name === 'dpkg-query') { if (process.env.CLOWDER_MANAGER !== 'apt-get') process.exit(1); console.log('gh: fixture'); process.exit(0); }
+if (name === 'rpm') { if (!['dnf', 'yum', 'zypper'].includes(process.env.CLOWDER_MANAGER)) process.exit(1); console.log('gh'); process.exit(0); }
+if (name === 'pacman' && args[0] === '-Qoq') { if (process.env.CLOWDER_MANAGER !== 'pacman') process.exit(1); console.log('github-cli'); process.exit(0); }
+if (name === 'gh' && args.includes('--help')) process.exit(process.env.CLOWDER_UNSUPPORTED || (process.env.CLOWDER_REQUIRE_UPGRADE && !fs.existsSync(process.env.CLOWDER_FIXTURE_LOG + '.upgraded')) ? 1 : 0);
 if (process.env.CLOWDER_EMPTY === name) process.exit(0);
 const skill = name === 'gh' ? 'azure-devops-cli' : name === 'playwright-cli' ? 'playwright-cli' : null;
 if (skill) {
@@ -263,10 +268,12 @@ if (skill) {
   fs.writeFileSync(path.join(dest, 'reference.txt'), 'reference');
 }
 `);
-  for (const name of ['npm', 'gh', 'playwright-cli']) {
+  for (const name of ['npm', 'gh', 'playwright-cli', 'winget', 'brew', 'apt-get', 'dnf', 'yum', 'zypper', 'pacman', 'dpkg-query', 'rpm']) {
     write(path.join(bin, name), `#!/bin/sh\nexec node "$(dirname "$0")/companion.cjs" ${name} "$@"\n`);
     write(path.join(bin, name + '.cmd'), `@"${process.execPath}" "%~dp0companion.cjs" ${name} %*\r\n`);
   }
+  write(path.join(bin, 'uname'), '#!/bin/sh\nprintf "Darwin\\n"\n');
+  fs.chmodSync(path.join(bin, 'uname'), 0o755);
   const env = { ...process.env, HOME: f.home, USERPROFILE: f.home, APPDATA: path.join(f.home, 'roaming'), XDG_CONFIG_HOME: path.join(f.home, 'xdg'), PATH: bin + path.delimiter + process.env.PATH, CLOWDER_DIR: repo, CLOWDER_FIXTURE_LOG: path.join(f.root, 'calls.log') };
   env.CLOWDER_FIXTURE_BIN = bashPath(bin);
   env.CLOWDER_FIXTURE_HOME = bashPath(f.home);
@@ -285,9 +292,31 @@ function invoke(wrapper, f, args) {
 }
 for (const wrapper of ['powershell', 'bash']) {
   const available = wrapper === 'powershell' ? psAvailable : !!bash;
+  if (wrapper === 'bash') test('bash: Linux package ownership and permissions gate upgrades', { skip: !available }, () => {
+    for (const root of [true, false]) {
+      const f = wrapperFixture();
+      f.env.CLOWDER_REQUIRE_UPGRADE = '1';
+      write(path.join(f.bin, 'uname'), '#!/bin/sh\nprintf "Linux\\n"\n');
+      write(path.join(f.bin, 'id'), `#!/bin/sh\nprintf "${root ? '0' : '1000'}\\n"\n`);
+      fs.chmodSync(path.join(f.bin, 'id'), 0o755);
+      f.env.CLOWDER_MANAGER = 'apt-get';
+      const result = invoke(wrapper, f, ['--project', f.project]);
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      const details = read(f.env.CLOWDER_FIXTURE_LOG + '.jsonl').trim().split(/\r?\n/).map(JSON.parse);
+      const upgrade = details.find(c => c.name === 'apt-get');
+      if (root) {
+        assert.deepEqual(upgrade.args, ['install', '--only-upgrade', '-y', 'gh']);
+        assert.ok(details.indexOf(upgrade) < details.findIndex(c => c.name === 'npm'));
+      } else {
+        assert.equal(upgrade, undefined);
+        assert.match(result.stdout + result.stderr, /no sudo is invoked/);
+      }
+    }
+  });
   test(`${wrapper}: isolated harness x scope x Mud matrix; idempotency, companions and unselected targets`, { skip: !available }, () => {
     for (const harness of ['copilot', 'antigravity', 'all']) for (const scope of ['project', 'global']) for (const mud of [false, true]) {
       const f = wrapperFixture();
+      f.env.CLOWDER_REQUIRE_UPGRADE = '1';
       const projectMode = scope === 'project';
       for (const name of ['.github', '.agents']) write(path.join(f.project, name, 'agents', 'user.agent.md'), 'keep');
       for (const base of [path.join(f.project, '.github'), path.join(f.project, '.agents'), path.join(f.home, '.copilot'), path.join(f.home, '.gemini', 'config')]) {
@@ -321,11 +350,16 @@ for (const wrapper of ['powershell', 'bash']) {
       }
       const calls = read(f.env.CLOWDER_FIXTURE_LOG).trim().split(/\r?\n/);
       assert.equal(calls.filter(c => c === 'uv').length, projectMode ? 0 : 1);
-      for (const name of ['npm', 'gh', 'playwright-cli']) assert.equal(calls.filter(c => c === name).length, 1);
+      for (const name of ['npm', 'gh', 'playwright-cli']) assert.equal(calls.filter(c => c === name).length, name === 'gh' ? 2 : 1);
+      const manager = wrapper === 'powershell' && process.platform === 'win32' ? 'winget' : 'brew';
+      assert.equal(calls.filter(c => c === manager).length, 1);
+      assert.ok(calls.indexOf(manager) < calls.indexOf('npm'));
       const details = read(f.env.CLOWDER_FIXTURE_LOG + '.jsonl').trim().split(/\r?\n/).map(JSON.parse);
       assert.deepEqual(details.find(c => c.name === 'npm').args, ['install', '-g', '@playwright/cli@latest']);
+      assert.deepEqual(details.find(c => c.name === manager).args, manager === 'winget' ?
+        ['upgrade', '--id', 'GitHub.cli', '--exact', '--silent', '--disable-interactivity', '--accept-source-agreements', '--accept-package-agreements'] : ['upgrade', 'gh']);
       assert.deepEqual(details.find(c => c.name === 'playwright-cli').args, ['install', '--skills', 'agents']);
-      const ghCall = details.find(c => c.name === 'gh');
+      const ghCall = details.find(c => c.name === 'gh' && c.args[1] === 'install');
       assert.deepEqual(ghCall.args.slice(0, 4), ['skill', 'install', 'github/awesome-copilot', 'azure-devops-cli']);
       assert.equal(ghCall.args[4], '--dir');
       assert.equal(ghCall.args[6], '--force');
@@ -337,6 +371,34 @@ for (const wrapper of ['powershell', 'bash']) {
       assert.equal(repeat.status, 0, repeat.stderr);
       assert.ok(!fs.existsSync(path.join(f.home, '.gemini', 'config', 'hooks')));
     }
+  });
+  test(`${wrapper}: upgrade failure and unsupported skills warn and continue`, { skip: !available }, () => {
+    for (const unsupported of [false, true]) {
+      const f = wrapperFixture();
+      f.env.CLOWDER_FAIL = wrapper === 'powershell' && process.platform === 'win32' ? 'winget' : 'brew';
+      if (unsupported) f.env.CLOWDER_UNSUPPORTED = '1';
+      const result = invoke(wrapper, f, wrapper === 'powershell' ? ['-ProjectDir', f.project] : ['--project', f.project]);
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      assert.match(result.stdout + result.stderr, /GitHub CLI upgrade failed/);
+      assert.equal(read(path.join(f.project, '.github', 'skills', 'playwright-cli', 'SKILL.md')), 'upstream playwright-cli');
+      if (unsupported) {
+        assert.match(result.stdout + result.stderr, /reopen the terminal/);
+        assert.doesNotMatch(result.stdout, /Installed companion skill: .*azure-devops-cli/);
+      }
+    }
+  });
+  test(`${wrapper}: no owning manager warns and continues`, { skip: !available }, () => {
+    const f = wrapperFixture();
+    if (wrapper === 'powershell' && process.platform === 'win32') {
+      for (const suffix of ['', '.cmd']) fs.rmSync(path.join(f.bin, 'winget' + suffix));
+      f.env.PATH = [f.bin, path.dirname(process.execPath), path.join(process.env.SystemRoot, 'System32')].join(path.delimiter);
+    } else {
+      write(path.join(f.bin, 'uname'), '#!/bin/sh\nprintf "Linux\\n"\n');
+    }
+    const result = invoke(wrapper, f, wrapper === 'powershell' ? ['-ProjectDir', f.project] : ['--project', f.project]);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stdout + result.stderr, /No supported package manager/);
+    assert.equal(read(path.join(f.project, '.github', 'skills', 'azure-devops-cli', 'SKILL.md')), 'upstream azure-devops-cli');
   });
   test(`${wrapper}: companion failures and absent output warn without blocking Clowder`, { skip: !available }, () => {
     for (const mode of ['CLOWDER_FAIL', 'CLOWDER_EMPTY']) for (const name of ['npm', 'gh', 'playwright-cli']) {
@@ -454,7 +516,7 @@ for (const wrapper of ['powershell', 'bash']) {
       assert.ok(fs.existsSync(path.join(f.project, '.agents', 'agents', stem + '.md')));
     }
     const calls = read(f.env.CLOWDER_FIXTURE_LOG).trim().split(/\r?\n/);
-    for (const name of ['npm', 'gh', 'playwright-cli']) assert.equal(calls.filter(c => c === name).length, 1);
+    for (const name of ['npm', 'gh', 'playwright-cli']) assert.equal(calls.filter(c => c === name).length, name === 'gh' ? 2 : 1);
     assert.ok(!calls.includes('uv'));
   });
 }
