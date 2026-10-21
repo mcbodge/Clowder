@@ -7,7 +7,7 @@
 # even outside a clone: it reuses the clone it runs from, or clones to
 # $HOME/.copilot/.cache/clowder. Override with CLOWDER_DIR / _URL.
 # --harness selects copilot (default), antigravity, or all; --mudblazor opts into extra content.
-# --project selects workspace content; --global-mud-mcp is an explicit global config exception.
+# --project selects workspace content; npm global CLI updates and --global-mud-mcp are exceptions.
 set -euo pipefail
 
 COPILOT="$HOME/.copilot"
@@ -44,6 +44,7 @@ expand_home() { case "$1" in '~') printf '%s\n' "$HOME";; '~/'*|'~\'*) printf '%
 [ -z "$PROJECT" ] || PROJECT="$(expand_home "$PROJECT")"
 [ -z "$REPO" ] || REPO="$(expand_home "$REPO")"
 if [ -n "$PROJECT" ] && [ ! -d "$PROJECT" ]; then echo "--project must name a directory." >&2; exit 1; fi
+[ -z "$PROJECT" ] || PROJECT="$(cd "$PROJECT" && pwd)"
 if [ -n "$MCP_PATH" ] && { [ "$GLOBAL_MUD_MCP" != true ] || [ "$HARNESS" = antigravity ]; }; then echo "--copilot-mcp-path requires --global-mud-mcp and a Copilot target." >&2; exit 1; fi
 if [ "$VERSION_PRESENT" = true ]; then
   if [ "$MUDBLAZOR" != true ] || { [ -z "$PROJECT" ] && [ "$GLOBAL_MUD_MCP" != true ]; }; then echo "--mudblazor-version requires project MCP registration or --global-mud-mcp." >&2; exit 1; fi
@@ -126,7 +127,56 @@ if [ "$NEEDS_HELPER" = true ]; then
   node "$REPO/scripts/install-support.mjs" "${helper_args[@]}"
 fi
 
-# Project mode: install into a repository's .github folder only, then stop (one method per run).
+install_companions() (
+  [ -z "$PROJECT" ] || echo "WARNING: Project scope exception: npm install -g updates the global Playwright CLI; companion skills stay in the selected project." >&2
+  stage="$(cd "$REPO" && pwd)/.clowder-companions-$$-$RANDOM"
+  mkdir "$stage" || { echo "WARNING: Cannot stage companions; continuing Clowder installation." >&2; return; }
+  trap 'rm -rf -- "$stage"' EXIT
+  cd "$stage" || { echo "WARNING: Cannot enter companion staging directory." >&2; return; }
+  if command -v npm >/dev/null 2>&1; then
+    npm install -g @playwright/cli@latest || echo "WARNING: playwright-cli update failed; trying the installed CLI." >&2
+  else
+    echo "WARNING: npm not found; install Node.js/npm to update playwright-cli." >&2
+  fi
+  if command -v playwright-cli >/dev/null 2>&1; then
+    if ! playwright-cli install --skills agents; then
+      echo "WARNING: playwright-cli skill installation failed; continuing Clowder installation." >&2
+      rm -rf -- "$stage/.agents/skills/playwright-cli"
+    fi
+  else
+    echo "WARNING: playwright-cli not found; install npm and run npm install -g @playwright/cli@latest." >&2
+  fi
+  if command -v gh >/dev/null 2>&1; then
+    if ! gh skill install github/awesome-copilot azure-devops-cli --dir "$stage/.agents/skills" --force; then
+      echo "WARNING: azure-devops-cli installation failed. Install/upgrade GitHub CLI from https://cli.github.com/ with gh skill support (gh skills may be unavailable); see https://cli.github.com/manual/gh_skill_install. Continuing Clowder installation." >&2
+      rm -rf -- "$stage/.agents/skills/azure-devops-cli"
+    fi
+  else
+    echo "WARNING: GitHub CLI (gh) not found; install/upgrade from https://cli.github.com/ with gh skill support for azure-devops-cli." >&2
+  fi
+  targets=()
+  if [ "$HARNESS" != antigravity ]; then targets+=("${PROJECT:-$HOME}/$([ -n "$PROJECT" ] && echo .github || echo .copilot)/skills"); fi
+  if [ "$HARNESS" != copilot ]; then targets+=("${PROJECT:-$HOME}/$([ -n "$PROJECT" ] && echo .agents || echo .gemini/config)/skills"); fi
+  for name in playwright-cli azure-devops-cli; do
+    source="$stage/.agents/skills/$name"
+    if [ ! -f "$source/SKILL.md" ]; then
+      echo "WARNING: $name did not produce SKILL.md; companion skill was NOT installed/updated." >&2
+      continue
+    fi
+    for target in "${targets[@]}"; do
+      if ( assert_safe_destination "$target/$name"
+           [ ! -e "$target/$name" ] || [ -d "$target/$name" ] || { echo "Expected companion directory" >&2; exit 1; }
+           if [ -d "$target/$name" ] && [ -n "$(find "$target/$name" -type l -print -quit)" ]; then echo "Refusing linked companion content" >&2; exit 1; fi
+           install_set "$target" r "$source" ); then
+        echo "Installed companion skill: $target/$name"
+      else
+        echo "WARNING: $name placement failed; continuing Clowder installation." >&2
+      fi
+    done
+  done
+)
+
+# Project mode: install workspace companions too; npm global update is an explicit exception.
 if [ -n "$PROJECT" ]; then
   if [ "$HARNESS" != antigravity ]; then
     GH="$PROJECT/.github"
@@ -134,6 +184,7 @@ if [ -n "$PROJECT" ]; then
     install_set "$GH/instructions" "" "$REPO"/instructions/*.instructions.md
     install_set "$GH/skills" "r" "$REPO"/skills/*
   fi
+  install_companions
   echo "==> Installed $HARNESS project content. Copilot project hooks require global hook scripts; Antigravity hook enforcement is not ported."
   exit 0
 fi
@@ -164,24 +215,8 @@ for dir in "$BASE/Code/User/prompts" "$BASE/Code - Insiders/User/prompts"; do
 done
 fi
 
-# 4. Update external companion tools when their CLIs are present (best effort).
-if [ "$HARNESS" != antigravity ]; then
-if command -v npm >/dev/null 2>&1; then
-  npm install -g @playwright/cli@latest || echo "playwright-cli update failed." >&2
-  if command -v playwright-cli >/dev/null 2>&1; then
-    playwright-cli install --skills || true
-  fi
-else
-  echo "npm not found; skipping playwright-cli." >&2
-fi
-if command -v gh >/dev/null 2>&1; then
-  gh skills install github/awesome-copilot azure-devops-cli || echo "azure-devops-cli update failed." >&2
-else
-  echo "GitHub CLI (gh) not found; skipping the azure-devops-cli skill." >&2
-fi
-else
-  echo "Skipping playwright/azure-devops companion skill placement: Antigravity integration is not supported by this installer." >&2
-fi
+# 4. Download each companion once, then place it in every selected harness.
+install_companions
 if command -v uv >/dev/null 2>&1; then
   uv tool upgrade graphifyy 2>/dev/null || uv tool install graphifyy || echo "graphify update failed." >&2
 else

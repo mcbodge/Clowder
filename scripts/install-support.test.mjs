@@ -247,6 +247,26 @@ function wrapperFixture() {
     fs.chmodSync(path.join(bin, name), 0o755);
     write(path.join(bin, name + '.cmd'), `@echo ${name}>>"%CLOWDER_FIXTURE_LOG%"\r\n${name === 'git' ? '@if "%~3"=="rev-parse" exit /b 1\r\n' : ''}@exit /b 0\r\n`);
   }
+  const tool = path.join(bin, 'companion.cjs');
+  write(tool, `
+const fs = require('node:fs'), path = require('node:path');
+const [name, ...args] = process.argv.slice(2);
+fs.appendFileSync(process.env.CLOWDER_FIXTURE_LOG, name + '\\n');
+fs.appendFileSync(process.env.CLOWDER_FIXTURE_LOG + '.jsonl', JSON.stringify({ name, args, cwd: process.cwd() }) + '\\n');
+if (process.env.CLOWDER_FAIL === name) { console.error('fixture failure: ' + name); process.exit(1); }
+if (process.env.CLOWDER_EMPTY === name) process.exit(0);
+const skill = name === 'gh' ? 'azure-devops-cli' : name === 'playwright-cli' ? 'playwright-cli' : null;
+if (skill) {
+  const base = name === 'gh' ? args[args.indexOf('--dir') + 1] : path.join(process.cwd(), '.agents', 'skills');
+  const dest = path.join(base, skill); fs.mkdirSync(dest, { recursive: true });
+  fs.writeFileSync(path.join(dest, 'SKILL.md'), 'upstream ' + skill);
+  fs.writeFileSync(path.join(dest, 'reference.txt'), 'reference');
+}
+`);
+  for (const name of ['npm', 'gh', 'playwright-cli']) {
+    write(path.join(bin, name), `#!/bin/sh\nexec node "$(dirname "$0")/companion.cjs" ${name} "$@"\n`);
+    write(path.join(bin, name + '.cmd'), `@"${process.execPath}" "%~dp0companion.cjs" ${name} %*\r\n`);
+  }
   const env = { ...process.env, HOME: f.home, USERPROFILE: f.home, APPDATA: path.join(f.home, 'roaming'), XDG_CONFIG_HOME: path.join(f.home, 'xdg'), PATH: bin + path.delimiter + process.env.PATH, CLOWDER_DIR: repo, CLOWDER_FIXTURE_LOG: path.join(f.root, 'calls.log') };
   env.CLOWDER_FIXTURE_BIN = bashPath(bin);
   env.CLOWDER_FIXTURE_HOME = bashPath(f.home);
@@ -270,6 +290,10 @@ for (const wrapper of ['powershell', 'bash']) {
       const f = wrapperFixture();
       const projectMode = scope === 'project';
       for (const name of ['.github', '.agents']) write(path.join(f.project, name, 'agents', 'user.agent.md'), 'keep');
+      for (const base of [path.join(f.project, '.github'), path.join(f.project, '.agents'), path.join(f.home, '.copilot'), path.join(f.home, '.gemini', 'config')]) {
+        write(path.join(base, 'skills', 'user-skill', 'SKILL.md'), 'keep');
+        write(path.join(base, 'skills', 'azure-devops-cli', 'user.txt'), 'keep');
+      }
       if (mud && projectMode) {
         write(path.join(f.project, '.vscode', 'mcp.json'), '{"servers":{"mudblazor":{}}}');
         write(path.join(f.project, '.agents', 'mcp_config.json'), '{"mcpServers":{"mudblazor":{}}}');
@@ -284,16 +308,58 @@ for (const wrapper of ['powershell', 'bash']) {
         const suffix = target === 'copilot' ? '.agent.md' : '.md';
         assert.equal(fs.existsSync(path.join(base, 'agents', 'cat-planner' + suffix)), selected);
         for (const stem of optionalAgents) assert.equal(fs.existsSync(path.join(base, 'agents', stem + suffix)), selected && mud);
+        for (const name of ['azure-devops-cli', 'playwright-cli']) {
+          assert.equal(fs.existsSync(path.join(base, 'skills', name, 'SKILL.md')), selected);
+          if (selected) {
+            assert.equal(read(path.join(base, 'skills', name, 'SKILL.md')), 'upstream ' + name);
+            assert.equal(read(path.join(base, 'skills', name, 'reference.txt')), 'reference');
+          }
+          assert.equal(read(path.join(base, 'skills', 'user-skill', 'SKILL.md')), 'keep');
+          assert.equal(read(path.join(base, 'skills', 'azure-devops-cli', 'user.txt')), 'keep');
+        }
         if (projectMode) assert.equal(read(path.join(base, 'agents', 'user.agent.md')), 'keep');
       }
       const calls = read(f.env.CLOWDER_FIXTURE_LOG).trim().split(/\r?\n/);
       assert.equal(calls.filter(c => c === 'uv').length, projectMode ? 0 : 1);
-      assert.equal(calls.filter(c => c === 'npm').length, projectMode || harness === 'antigravity' ? 0 : 1);
-      assert.equal(calls.filter(c => c === 'gh').length, projectMode || harness === 'antigravity' ? 0 : 1);
+      for (const name of ['npm', 'gh', 'playwright-cli']) assert.equal(calls.filter(c => c === name).length, 1);
+      const details = read(f.env.CLOWDER_FIXTURE_LOG + '.jsonl').trim().split(/\r?\n/).map(JSON.parse);
+      assert.deepEqual(details.find(c => c.name === 'npm').args, ['install', '-g', '@playwright/cli@latest']);
+      assert.deepEqual(details.find(c => c.name === 'playwright-cli').args, ['install', '--skills', 'agents']);
+      const ghCall = details.find(c => c.name === 'gh');
+      assert.deepEqual(ghCall.args.slice(0, 4), ['skill', 'install', 'github/awesome-copilot', 'azure-devops-cli']);
+      assert.equal(ghCall.args[4], '--dir');
+      assert.equal(ghCall.args[6], '--force');
+      assert.equal(path.resolve(ghCall.args[5]), path.join(ghCall.cwd, '.agents', 'skills'));
+      assert.equal(ghCall.cwd, details.find(c => c.name === 'playwright-cli').cwd);
+      assert.match(path.basename(ghCall.cwd), /^\.clowder-companions-/);
+      assert.ok(!fs.existsSync(ghCall.cwd));
       const repeat = invoke(wrapper, f, args);
       assert.equal(repeat.status, 0, repeat.stderr);
       assert.ok(!fs.existsSync(path.join(f.home, '.gemini', 'config', 'hooks')));
     }
+  });
+  test(`${wrapper}: companion failures and absent output warn without blocking Clowder`, { skip: !available }, () => {
+    for (const mode of ['CLOWDER_FAIL', 'CLOWDER_EMPTY']) for (const name of ['npm', 'gh', 'playwright-cli']) {
+      const f = wrapperFixture(); f.env[mode] = name;
+      const oldSkill = path.join(f.project, '.github', 'skills', 'azure-devops-cli', 'SKILL.md');
+      write(oldSkill, 'placeholder, not an upstream skill');
+      const result = invoke(wrapper, f, wrapper === 'powershell' ? ['-ProjectDir', f.project] : ['--project', f.project]);
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      assert.ok(fs.existsSync(path.join(f.project, '.github', 'agents', 'cat-planner.agent.md')));
+      if (!(mode === 'CLOWDER_EMPTY' && name === 'npm')) assert.match(result.stdout + result.stderr, /WARNING|WARNING:/i);
+      if (name === 'gh') {
+        assert.match(result.stdout + result.stderr, mode === 'CLOWDER_FAIL' ? /Install\/upgrade GitHub CLI/ : /NOT installed\/updated/);
+        assert.equal(read(oldSkill), 'placeholder, not an upstream skill');
+        assert.doesNotMatch(result.stdout, /Installed companion skill: .*azure-devops-cli/);
+      }
+    }
+  });
+  test(`${wrapper}: relative project placement survives isolated staging cwd`, { skip: !available }, () => {
+    const f = wrapperFixture();
+    const relative = path.relative(repo, f.project);
+    const result = invoke(wrapper, f, wrapper === 'powershell' ? ['-ProjectDir', relative] : ['--project', bashPath(relative).replaceAll('\\', '/')]);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    for (const name of ['playwright-cli', 'azure-devops-cli']) assert.equal(read(path.join(f.project, '.github', 'skills', name, 'SKILL.md')), 'upstream ' + name);
   });
   test(`${wrapper}: invalid options fail before git or writes`, { skip: !available }, () => {
     for (const args of (wrapper === 'powershell' ? [
@@ -320,6 +386,7 @@ for (const wrapper of ['powershell', 'bash']) {
   });
   test(`${wrapper}: core needs no Node, conversion fails early without Node`, { skip: !available }, t => {
     const f = wrapperFixture();
+    for (const name of ['npm', 'gh', 'playwright-cli']) for (const suffix of ['', '.cmd']) fs.rmSync(path.join(f.bin, name + suffix));
     // Controlled PATH keeps shells/system utilities and fake git, but no Node/package managers.
     if (wrapper === 'powershell') {
       f.env.PATH = f.bin + path.delimiter + path.join(process.env.SystemRoot || '/usr', 'System32');
@@ -332,6 +399,9 @@ for (const wrapper of ['powershell', 'bash']) {
     const success = invoke(wrapper, f, projectArgs);
     assert.equal(success.status, 0, success.stderr);
     assert.ok(fs.existsSync(path.join(homeProject, '.github', 'agents', 'cat-planner.agent.md')));
+    assert.match(success.stdout + success.stderr, /npm not found/);
+    assert.match(success.stdout + success.stderr, /GitHub CLI \(gh\) not found/);
+    assert.match(success.stdout + success.stderr, /playwright-cli not found/);
     const failure = invoke(wrapper, f, [...projectArgs, ...(wrapper === 'powershell' ? ['-Harness', 'antigravity'] : ['--harness', 'antigravity'])]);
     assert.notEqual(failure.status, 0);
     assert.match(failure.stdout + failure.stderr, /Node.js 22\+/);
@@ -359,7 +429,7 @@ for (const wrapper of ['powershell', 'bash']) {
     assert.equal(read(antigravityMcp), '{"mcpServers":{"mudblazor":{"command":"custom"}}}');
     assert.ok(!fs.existsSync(path.join(f.home, '.copilot')));
   });
-  test(`${wrapper}: global MCP implies Mud and is the only project-mode global exception`, { skip: !available }, () => {
+  test(`${wrapper}: global MCP implies Mud alongside the npm project-mode global exception`, { skip: !available }, () => {
     const f = wrapperFixture();
     const config = path.join(f.home, 'custom profile', 'mcp.json');
     const anti = path.join(f.home, '.gemini', 'config', 'mcp_config.json');
@@ -383,7 +453,9 @@ for (const wrapper of ['powershell', 'bash']) {
       assert.ok(fs.existsSync(path.join(f.project, '.github', 'agents', stem + '.agent.md')));
       assert.ok(fs.existsSync(path.join(f.project, '.agents', 'agents', stem + '.md')));
     }
-    assert.ok(read(f.env.CLOWDER_FIXTURE_LOG).trim().split(/\r?\n/).every(c => c === 'git'));
+    const calls = read(f.env.CLOWDER_FIXTURE_LOG).trim().split(/\r?\n/);
+    for (const name of ['npm', 'gh', 'playwright-cli']) assert.equal(calls.filter(c => c === name).length, 1);
+    assert.ok(!calls.includes('uv'));
   });
 }
 test('repository-owned optional skill convention excludes only source-owned bundles and preserves binary bytes', () => {

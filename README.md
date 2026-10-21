@@ -201,7 +201,7 @@ Weight is the relative size of the prompt that loads when the agent runs (●○
 
 ## Install or update everything
 
-The two `update-all` entry points install selected content, acquiring/updating the source clone first. Default: **Copilot, global, no MudBlazor**. The [cat-install](skills/cat-install/SKILL.md) skill delegates to them. Reuse the source clone, or bootstrap into `~/.copilot/.cache/clowder`; override via `-RepoDir` / `CLOWDER_DIR` and `-Url` / `CLOWDER_URL`. Global invocations update available companions once, even for `all`; project mode skips companions. Antigravity-only skips unsupported playwright/DevOps companion skill placement (graphify can still be updated).
+The two `update-all` entry points install selected content, acquiring/updating the source clone first. Default: **Copilot, global, no MudBlazor**. The [cat-install](skills/cat-install/SKILL.md) skill delegates to them. Reuse the source clone, or bootstrap into `~/.copilot/.cache/clowder`; override via `-RepoDir` / `CLOWDER_DIR` and `-Url` / `CLOWDER_URL`. Every harness and scope automatically installs/updates Playwright CLI and the azure-devops-cli skill, downloading each once even for `all`. Graphify updates remain global-scope only.
 
 | PowerShell | Bash | Default / meaning |
 | --- | --- | --- |
@@ -341,7 +341,9 @@ cp -R skills/* "$PROJ"/.github/skills/
 
 ## Prerequisites and companions
 
-The agents call these tools; they aren't included here. Install them from their sources so they stay current.
+The agents call these tools; they aren't included here. The update scripts automatically run `npm install -g @playwright/cli@latest`, generate Playwright skills with `playwright-cli install --skills agents`, and run `gh skill install github/awesome-copilot azure-devops-cli --dir <staging-skills> --force`. The singular `skill` command and custom-directory option are documented in the [GitHub CLI manual](https://cli.github.com/manual/gh_skill_install); older `gh` versions may not support skills at all. Install/upgrade GitHub CLI from [cli.github.com](https://cli.github.com/) rather than installing an arbitrary extension.
+
+Skills are generated in an isolated directory under the source clone, then only the selected bundles are copied to Copilot `~/.copilot/skills` (global) or `.github/skills` (project), and Antigravity `~/.gemini/config/skills` (global) or `.agents/skills` (project). Staging is removed afterward; unrelated skills are preserved. **The npm global CLI update is an intentional exception to project-only writes**, including Antigravity project installs. npm/Node.js and a GitHub CLI with `gh skill` support are prerequisites for automatic companion updates, not for the basic Copilot copy. Missing tools, failed updates, or missing generated `SKILL.md` produce explicit warnings and do not block Clowder installation; a retained older skill is not reported as successfully updated. Browser/runtime setup, Azure CLI extensions and authentication remain manual.
 
 | Companion | Used by | Get it |
 | --- | --- | --- |
